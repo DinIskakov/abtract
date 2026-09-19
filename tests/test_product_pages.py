@@ -141,6 +141,14 @@ def test_create_loop_job(client: TestClient, fake_runner, seeded):
     assert saved2.model_ids == ["mock"] and [k.value for k in saved2.agent_kinds] == ["vision"]
 
 
+def test_quick_scan_defaults_to_a_small_grid(client: TestClient, fake_runner):
+    r = client.post("/api/jobs", json={"url": "https://example.com", "scan_mode": "quick"})
+    assert r.status_code == 200
+    job = store.load_job(r.json()["job_id"])
+    assert job.scan_mode == "quick" and len(job.model_ids) == 1
+    assert [k.value for k in job.agent_kinds] == ["text", "dom"]
+
+
 @pytest.mark.parametrize("body,needle", [
     ({"type": "intake"}, "url is required"),
     ({"type": "intake", "url": "   "}, "url is required"),

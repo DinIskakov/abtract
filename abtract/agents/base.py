@@ -309,7 +309,8 @@ class BaseAgent:
         self.site_url = site_url
         history: list[dict[str, Any]] = []
         max_steps = task.max_steps or settings.default_max_steps
-        deadline = ep.started_at + settings.episode_timeout_s
+        time_limit = task.timeout_s or settings.episode_timeout_s
+        deadline = ep.started_at + time_limit
         started = False
         try:
             if self.kind == AgentKind.vision and not self.spec.supports_vision:
@@ -322,7 +323,7 @@ class BaseAgent:
             for i in range(max_steps):
                 if time.time() > deadline:
                     ep.failure_mode = "timeout"
-                    ep.error = f"episode exceeded {settings.episode_timeout_s}s"
+                    ep.error = f"episode exceeded {time_limit}s"
                     break
                 t0 = time.time()
                 url_before = self._safe_url()
@@ -334,7 +335,14 @@ class BaseAgent:
                     obs = Observation(text=f"(observation failed: {type(e).__name__}: {e})", url=url_before)
                 self._log(f"--- step {i + 1}/{max_steps} @ {url_before}\n{obs.text[:1500]}{'...' if len(obs.text) > 1500 else ''}")
                 messages = self.build_messages(task, history, obs, i, max_steps)
-                resp = llm.chat(self.spec, messages, json_mode=True)  # LLMError -> episode error (model unusable)
+                call_options = {}
+                if task.timeout_s is not None:
+                    remaining = deadline - time.time()
+                    if remaining <= 0:
+                        ep.failure_mode, ep.error = "timeout", f"episode exceeded {time_limit}s"
+                        break
+                    call_options = {"timeout_s": min(15.0, remaining), "retries": 1}
+                resp = llm.chat(self.spec, messages, json_mode=True, **call_options)
                 ep.usage.add(resp.usage)
                 thought, action, err = parse_reply(resp.text)
                 self._log(f"model: {resp.text[:500]}")

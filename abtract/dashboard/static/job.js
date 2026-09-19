@@ -183,7 +183,7 @@
     document.title = `abtract — ${text}`;
     const type = $('#type');
     type.classList.remove('hidden');
-    type.textContent = job.type === 'loop' ? `optimize loop × ${job.iterations || 1}` : 'intake';
+    type.textContent = job.type === 'loop' ? `optimize loop × ${job.iterations || 1}` : job.scan_mode === 'quick' ? 'quick scan' : 'full audit';
     const st = $('#status');
     st.className = `pill ${job.status}`;
     st.textContent = job.status;
@@ -287,7 +287,7 @@
     box.replaceChildren(el('div', { class: 'card-head' }, el('h2', {}, 'Initial findings'),
       el('span', { class: 'pill pending' }, job.status === 'failed' ? 'Partial results' : 'Live · preliminary')));
     const status = job.status === 'failed' ? 'The run stopped. These are the results collected before it stopped.' :
-      p?.completed ? 'Results update as attempts finish. Early results may change as more agents report back.' :
+      p?.completed ? 'Your first results are ready. Findings update below as the remaining attempts finish.' :
       p?.total ? 'Agents are working through your tasks. The first completed attempt will appear here automatically.' :
       p?.pages_scanned ? 'We’re checking the fetched pages and preparing tasks for the agents.' :
       'We’re fetching your website. Initial checks will appear here as pages arrive.';
@@ -296,12 +296,26 @@
     if (job.model_ids.length === 1 && job.model_ids[0] === 'mock') {
       box.append(el('p', { class: 'preview-note' }, 'Offline workflow test: mock results do not measure website quality.'));
     }
+    if (p.page) {
+      const page = p.page;
+      box.append(el('div', { class: 'preview-page' },
+        el('div', { class: 'sub' }, 'Homepage read'),
+        el('strong', {}, page.title || 'Your website'),
+        page.heading ? el('p', {}, page.heading) : null,
+        el('div', { class: 'sub' }, `${page.links} links · ${page.forms} forms in the fetched HTML`)));
+    }
     box.append(el('p', { class: 'sub' }, `${p.site_version} · ${p.pages_scanned} page${p.pages_scanned === 1 ? '' : 's'} scanned`));
     if (p.total) {
       const assessed = p.passed + p.failed;
       box.append(el('div', { class: 'stat-row preview-stats' },
-        stat('Completed attempts', p.completed - p.skipped, v => `${v} / ${p.total}`, 'lower', null, 'remaining attempts are still untested'),
+        stat('Completed attempts', p.completed - p.skipped, v => `${v} / ${p.total}`, 'lower', null,
+          `${Math.max(0, p.total - p.completed)} still to finish${p.skipped ? ` · ${p.skipped} skipped` : ''}`),
         stat('Success so far', assessed ? p.passed / assessed : null, fmtPct, 'pct', null, `${assessed} assessed · ${p.errors} execution errors`)));
+    }
+    if (job.status === 'running' && p.active?.length) {
+      const activeTasks = [...new Set(p.active.map(a => a.prompt))];
+      box.append(el('h3', {}, `Checking now · ${p.active.length} attempts in progress`),
+        el('ul', { class: 'preview-notes' }, ...activeTasks.slice(0, 3).map(prompt => el('li', {}, prompt))));
     }
     if (p.findings.length) {
       box.append(el('h3', {}, 'What completed attempts show'),
@@ -445,6 +459,8 @@
       box.append(el('section', { class: 'card' }, 'Offline workflow test: the mock agents give up by default. These scores do not measure your website’s quality.'));
     }
     const O = run.overall, B = cmp ? cmp.a.overall : null;
+    if (run.scan_mode === 'quick') box.append(el('div', { class: 'card preview-note' },
+      'Quick scan: a small sample with up to 6 steps per attempt. Results describe these tasks only. Run a full audit for broader coverage.'));
     const headline = el('section', { class: 'card' },
       el('div', { class: 'card-head' },
         el('h2', {}, cmp ? `Before vs after · ${cmp.a.site_version} → ${cmp.b.site_version}` : `Results · ${run.site_version}`),
@@ -476,6 +492,17 @@
   }
 
   // ---------------------------------------------------------------- CTAs
+  async function startFullAudit(job, btn) {
+    btn.disabled = true;
+    const status = $('#cta-status');
+    status.textContent = 'Starting full audit…';
+    try {
+      const res = await api('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'intake', url: job.url, scan_mode: 'full' }) });
+      location.href = `/jobs/${encodeURIComponent(res.job_id)}`;
+    } catch (e) { status.textContent = e.message; status.classList.add('err'); btn.disabled = false; }
+  }
+
   async function startLoop(job, iterations, btn) {
     const lastId = job.run_ids[job.run_ids.length - 1];
     let run = null;
@@ -513,9 +540,13 @@
       return;
     }
     const hasRun = job.run_ids.length > 0;
+    if (job.scan_mode === 'quick' && job.url) {
+      const audit = el('button', { class: 'btn primary lg', onclick: () => startFullAudit(job, audit) }, 'Run full audit');
+      box.append(audit);
+    }
     if (hasRun) {
       const sel = el('select', { id: 'iterations', 'aria-label': 'iterations' }, ...[1, 2, 3].map(n => el('option', { value: n, selected: n === 1 }, `${n} iteration${n === 1 ? '' : 's'}`)));
-      const btn = el('button', { class: 'btn primary lg', onclick: () => startLoop(job, Number(sel.value), btn) }, job.type === 'loop' ? 'Optimize again' : 'Optimize in a loop');
+      const btn = el('button', { class: `btn ${job.scan_mode === 'quick' ? '' : 'primary'} lg`, onclick: () => startLoop(job, Number(sel.value), btn) }, job.type === 'loop' ? 'Optimize again' : 'Optimize in a loop');
       box.append(btn, el('label', {}, 'for', sel));
     }
     box.append(el('a', { class: 'btn lg', href: dashHref }, 'Open full dashboard'), el('a', { class: 'btn lg ghost', href: '/' }, 'New run'),

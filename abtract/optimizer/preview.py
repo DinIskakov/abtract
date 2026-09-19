@@ -3,7 +3,16 @@ from collections import Counter
 
 from bs4 import BeautifulSoup
 
-from abtract.schemas import Episode, JobPreview, PreviewAttempt, Task
+from abtract.schemas import Episode, JobPreview, PageSummary, PreviewAttempt, Task
+
+
+def summarize_page(html: bytes) -> PageSummary:
+    """A useful first response even when the homepage has no obvious obstacles."""
+    soup = BeautifulSoup(html, "html.parser")
+    heading = soup.find("h1")
+    return PageSummary(title=soup.title.get_text(" ", strip=True)[:200] if soup.title else "",
+                       heading=heading.get_text(" ", strip=True)[:240] if heading else "",
+                       links=len(soup.find_all("a", href=True)), forms=len(soup.find_all("form")))
 
 
 def inspect_page(path: str, html: bytes) -> list[str]:

@@ -8,6 +8,7 @@
     ['dom', 'DOM', 'real browser, accessibility tree'],
     ['vision', 'Vision', 'real browser, screenshots'],
   ];
+  let registryModels = [];
 
   function el(tag, attrs = {}, ...children) {
     const e = document.createElement(tag);
@@ -61,6 +62,7 @@
   }
 
   function renderModels(models) {
+    registryModels = models;
     const box = $('#models');
     box.innerHTML = '';
     const online = models.filter(m => m.provider !== 'mock');
@@ -86,9 +88,22 @@
   }
 
   const checked = name => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
+  function applyScanMode() {
+    const quick = $('#scan-mode').value === 'quick';
+    const defaults = registryModels.filter(m => m.default).map(m => m.id);
+    document.querySelectorAll('input[name="model"]').forEach(input => {
+      input.checked = (quick ? defaults.slice(0, 1) : defaults).includes(input.value);
+    });
+    document.querySelectorAll('input[name="agent"]').forEach(input => { input.checked = !quick || input.value !== 'vision'; });
+    $('#go').textContent = quick ? 'Run quick scan' : 'Run full audit';
+    updateSummary();
+  }
   function updateSummary() {
     const m = checked('model').length, a = checked('agent').length;
     $('#options-sub').textContent = `${m} model${m === 1 ? '' : 's'} × ${a} agent kind${a === 1 ? '' : 's'}`;
+    $('#scan-description').textContent = $('#scan-mode').value === 'quick'
+      ? `Up to 3 short tasks × ${m} model${m === 1 ? '' : 's'} × ${a} agent kinds. Expand to a full audit from your results.`
+      : 'Every task across your selected models and agents. Results appear as they finish; a full audit can take several minutes.';
   }
 
   // ---------------------------------------------------------------- recent jobs
@@ -137,7 +152,7 @@
     try {
       const res = await api('/api/jobs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'intake', url, model_ids, agent_kinds }),
+        body: JSON.stringify({ type: 'intake', url, model_ids, agent_kinds, scan_mode: $('#scan-mode').value }),
       });
       setStatus('Job started, opening progress…');
       location.href = `/jobs/${encodeURIComponent(res.job_id)}`;
@@ -156,10 +171,11 @@
     setStatus('Demo site loaded: a fake GPU-cloud landing page with 10 deliberate agent traps.');
   });
   $('#url').addEventListener('input', () => setStatus(''));
+  $('#scan-mode').addEventListener('change', applyScanMode);
 
   renderAgents();
   updateSummary();
-  api('/api/models').then(r => { renderModels(r.models || []); updateSummary(); })
+  api('/api/models').then(r => { renderModels(r.models || []); applyScanMode(); })
     .catch(e => { $('#models').innerHTML = ''; $('#models').append(el('span', { class: 'muted' }, `could not load models: ${e.message}`)); });
   loadDemoUrl();
   loadJobs();

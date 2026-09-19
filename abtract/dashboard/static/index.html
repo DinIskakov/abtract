@@ -26,14 +26,23 @@
 
     <form id="intake" class="url-form" autocomplete="off" novalidate>
       <input id="url" name="url" class="url" type="text" inputmode="url" placeholder="https://your-site.com" spellcheck="false" autofocus aria-label="Website URL">
-      <button type="submit" id="go" class="btn primary lg">Run the swarm</button>
+      <button type="submit" id="go" class="btn primary lg">Run quick scan</button>
     </form>
     <div class="hero-actions">
       <button type="button" id="demo" class="btn ghost">Try with the demo site</button>
       <span id="form-status" class="form-status" role="status"></span>
     </div>
 
-    <details class="options" id="options" open>
+    <div class="scan-choice">
+      <label for="scan-mode">Start with</label>
+      <select id="scan-mode">
+        <option value="quick" selected>Quick scan</option>
+        <option value="full">Full audit</option>
+      </select>
+      <span class="sub" id="scan-description">3 short tasks · 1 model · text and browser checks. Expand to a full audit from your results.</span>
+    </div>
+
+    <details class="options" id="options">
       <summary>Options <span class="sub" id="options-sub"></span></summary>
       <div class="options-grid">
         <div class="opt">
@@ -55,13 +64,13 @@
       <div class="how-step">
         <span class="num">1</span>
         <h3>Mirror</h3>
-        <p>We fetch your site and host a snapshot, then Gemini writes realistic tasks a visitor might ask an agent to do on it.</p>
+        <p>We fetch a snapshot of your site and show what agents can read. Quick scans start with short, checkable tasks.</p>
         <span class="arrow">→</span>
       </div>
       <div class="how-step">
         <span class="num">2</span>
         <h3>Swarm</h3>
-        <p>Text, DOM and vision agents driven by several LLMs attempt every task. We score success, steps, time and cost, and record every trace.</p>
+        <p>See results as agents finish each task. Start with a small quick scan, then expand to a full audit across models and text, DOM and vision agents.</p>
         <span class="arrow">→</span>
       </div>
       <div class="how-step">

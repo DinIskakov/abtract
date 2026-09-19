@@ -46,6 +46,7 @@ def chat(
     max_output_tokens: int | None = None,
     temperature: float = 0.2,
     retries: int = 3,
+    timeout_s: float | None = None,
 ) -> LLMResponse:
     """Blocking. Retries transient failures with backoff. Raises LLMError after `retries` attempts."""
     if any(_has_image(m) for m in messages) and not spec.supports_vision:
@@ -56,9 +57,9 @@ def chat(
         t0 = time.time()
         try:
             if spec.provider == "modal":
-                resp = _chat_openai_compatible(spec, messages, json_mode, max_out, temperature)
+                resp = _chat_openai_compatible(spec, messages, json_mode, max_out, temperature, timeout_s)
             elif spec.provider == "gemini":
-                resp = _chat_gemini(spec, messages, json_mode, max_out, temperature)
+                resp = _chat_gemini(spec, messages, json_mode, max_out, temperature, timeout_s)
             elif spec.provider == "mock":
                 resp = _chat_mock(spec, messages, json_mode)
             else:
@@ -70,7 +71,8 @@ def chat(
             raise
         except Exception as e:  # noqa: BLE001  transient: rate limit, network, 5xx
             last_err = e
-            time.sleep(min(2**attempt, 8))
+            if attempt + 1 < retries:
+                time.sleep(min(2**attempt, 8))
     raise LLMError(f"{spec.id}: {last_err}") from last_err
 
 
@@ -184,12 +186,15 @@ def reset_modal_model_cache() -> None:
 
 # --------------------------------------------------------------------------- Modal (OpenAI-compatible)
 
-def _chat_openai_compatible(spec, messages, json_mode, max_out, temperature) -> LLMResponse:
+def _chat_openai_compatible(spec, messages, json_mode, max_out, temperature, timeout_s=None) -> LLMResponse:
     from openai import OpenAI
 
     if not settings.modal_proxy_token:
         raise LLMError("MODAL_PROXY_TOKEN is not set (see .env.example)")
-    client = OpenAI(api_key=settings.modal_proxy_token, base_url=modal_base_url(spec), timeout=120)
+    # chat() owns retries. SDK retries here used to multiply one request into up
+    # to nine attempts and could keep a demo worker blocked for many minutes.
+    client = OpenAI(api_key=settings.modal_proxy_token, base_url=modal_base_url(spec),
+                    timeout=timeout_s if timeout_s is not None else settings.step_timeout_s, max_retries=0)
     oa_messages = []
     for m in messages:
         if isinstance(m.content, str):
@@ -215,13 +220,15 @@ def _chat_openai_compatible(spec, messages, json_mode, max_out, temperature) -> 
 
 # --------------------------------------------------------------------------- Gemini
 
-def _chat_gemini(spec, messages, json_mode, max_out, temperature) -> LLMResponse:
+def _chat_gemini(spec, messages, json_mode, max_out, temperature, timeout_s=None) -> LLMResponse:
     from google import genai
     from google.genai import types
 
     if not settings.gemini_api_key:
         raise LLMError("GEMINI_API_KEY is not set (see .env.example)")
-    client = genai.Client(api_key=settings.gemini_api_key)
+    options = {"http_options": types.HttpOptions(timeout=max(1, int(timeout_s * 1000)),
+                                                retry_options=types.HttpRetryOptions(attempts=1))} if timeout_s is not None else {}
+    client = genai.Client(api_key=settings.gemini_api_key, **options)
     system_parts = [m.content for m in messages if m.role == "system" and isinstance(m.content, str)]
     contents = []
     for m in messages:

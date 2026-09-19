@@ -11,6 +11,10 @@ The chosen list is persisted to sites/<site_id>/tasks.json (store.save_site_task
 from __future__ import annotations
 
 import json
+import re
+from urllib.parse import unquote, urlsplit
+
+from bs4 import BeautifulSoup
 
 from abtract import store
 from abtract.config import settings
@@ -77,3 +81,41 @@ def pick_tasks(site_id: str, version: str, *, source_url: str | None = None, n_g
         store.save_site_tasks(site_id, tasks)
         store.commit()
     return tasks, how
+
+
+def pick_quick_tasks(site_id: str, version: str) -> list[Task]:
+    """Three short, checkable tasks, without waiting for task-generation inference.
+
+    Preserve the full task file. The quick run records its own task subset and limits
+    so later optimization can use exactly the same evaluation conditions.
+    """
+    tasks = _site_provided(site_id, version)
+    if not tasks:
+        root = store.site_dir(site_id, version).resolve()
+        soup = BeautifulSoup((root / "index.html").read_bytes(), "html.parser")
+        heading = soup.find("h1")
+        if heading and heading.get_text(" ", strip=True):
+            tasks.append(Task(id="quick_headline", kind="answer", prompt="What is the main headline on the homepage?",
+                              expected_answer=heading.get_text(" ", strip=True), max_steps=3))
+        seen = set()
+        for link in soup.find_all("a", href=True):
+            parts = urlsplit(str(link["href"]))
+            label = link.get_text(" ", strip=True)
+            path = unquote(parts.path).lstrip("/")
+            target = (root / path).resolve()
+            if (parts.scheme or parts.netloc or not label or not path or path in seen
+                    or not target.is_relative_to(root) or not target.is_file() or target.suffix != ".html"
+                    or target == root / "index.html"):
+                continue
+            seen.add(path)
+            tasks.append(Task(id=f"quick_link_{len(seen)}", kind="url", max_steps=6,
+                              prompt=f'Starting from the homepage, follow the link named "{label[:120]}" and stop on its destination page.',
+                              expected_url_pattern=f"^{re.escape(path)}(?:[?#].*)?$"))
+            if len(tasks) >= 3:
+                break
+        if not tasks:
+            # This is a page-reachability check, not a made-up claim about its content.
+            tasks = [Task(id="quick_home", kind="url", prompt="Open the homepage and stop there.",
+                          expected_url_pattern=r"^(?:index\.html)?(?:[?#].*)?$", max_steps=3)]
+    return [t.model_copy(update={"max_steps": min(t.max_steps, 6), "timeout_s": 60.0})
+            for t in sorted(tasks, key=lambda t: (t.max_steps, t.kind == TaskKind.action))[:3]]

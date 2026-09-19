@@ -175,6 +175,7 @@ class JobRequest(BaseModel):
     """Body of POST /api/jobs. `model_ids`/`agent_kinds` omitted -> defaults; given but empty -> 422."""
 
     type: Literal["intake", "loop"] = "intake"
+    scan_mode: Literal["quick", "full"] = "full"
     url: str | None = None
     site_id: str | None = None
     site_version: str | None = None
@@ -232,6 +233,8 @@ def _build_job(req: JobRequest) -> Job:
 
     if req.model_ids is None:
         model_ids = list(run.model_ids) if run and run.model_ids else list(defaults) or (["mock"] if "mock" in models else [])
+        if req.type == "intake" and req.scan_mode == "quick":
+            model_ids = model_ids[:1]
     else:
         model_ids = list(dict.fromkeys(m.strip() for m in req.model_ids if m and m.strip()))
     if not model_ids:
@@ -242,6 +245,8 @@ def _build_job(req: JobRequest) -> Job:
 
     if req.agent_kinds is None:
         kinds = [k.value for k in run.agent_kinds] if run and run.agent_kinds else list(AGENT_KINDS)
+        if req.type == "intake" and req.scan_mode == "quick":
+            kinds = ["text", "dom"]
     else:
         kinds = list(dict.fromkeys(k.strip() for k in req.agent_kinds if k and k.strip()))
     bad = [k for k in kinds if k not in AGENT_KINDS]
@@ -253,7 +258,8 @@ def _build_job(req: JobRequest) -> Job:
         raise HTTPException(422, "budget_usd must be a positive number of dollars")
 
     allowance = req.budget_usd if req.budget_usd is not None else settings.job_swarm_budget_usd
-    common: dict[str, Any] = {"model_ids": model_ids, "agent_kinds": [AgentKind(k) for k in kinds], "budget_usd": allowance}
+    common: dict[str, Any] = {"model_ids": model_ids, "agent_kinds": [AgentKind(k) for k in kinds],
+                              "budget_usd": allowance, "scan_mode": run.scan_mode if run else req.scan_mode}
     if req.type == "intake":
         return Job(type="intake", url=_normalize_url(req.url or ""), **common)
     assert run is not None

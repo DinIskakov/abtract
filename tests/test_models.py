@@ -198,6 +198,8 @@ def test_chat_sends_the_resolved_name(monkeypatch, fresh_resolution):
     r = llm.chat(get_model("kimi-k3"), [ChatMessage(role="user", content="hello")], retries=1)
     assert captured["model"] == "kimi-k3.us-west.modal.direct"
     assert captured["client_kwargs"]["api_key"] == "wk-x.ws-y"
+    assert captured["client_kwargs"]["max_retries"] == 0
+    assert captured["client_kwargs"]["timeout"] == settings.step_timeout_s
     assert r.text == "hi" and r.usage.input_tokens == 7 and r.usage.llm_calls == 1
 
 

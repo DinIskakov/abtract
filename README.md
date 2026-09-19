@@ -4,10 +4,14 @@ abtract measures how well AI agents can use a website, then uses Gemini to propo
 
 ## Product flow
 
-1. Enter a URL on the landing page, or choose **Try with the demo site**.
-2. abtract mirrors the site, chooses tasks, and runs a swarm while the job page shows progress. Initial HTML checks appear as pages arrive; completed attempts, evidence, and preliminary findings update every two seconds during the swarm. These use existing data without extra model calls. The final report replaces the preview when the job finishes.
+1. Enter a URL on the landing page, or choose **Try with the demo site**. **Quick scan** is the default: up to three short tasks, one model, and Text + DOM agents (six attempts for the demo). Choose **Full audit** for the complete task/model/agent grid.
+2. abtract mirrors the site and immediately shows the fetched homepage's title, headline, links, forms, and initial HTML checks. During the swarm, the page shows tasks in progress, completed attempts, and preliminary findings every two seconds. The final report replaces the preview when the job finishes.
 3. The report shows task results, agent/model breakdowns, costs, and findings. The dashboard provides traces, screenshots, and version diffs.
 4. Choose **Optimize in a loop** for one to three iterations. Gemini proposes changes, the validator checks the candidate, and another swarm measures the new version against the original baseline. Failed validation rejects the candidate.
+
+Quick scans choose checkable tasks from the site's task file or fetched HTML, with no task-generation or report-writing model call. Each task is limited to six steps with a 60-second agent-loop deadline and one inference attempt per step (up to 15 seconds per request). Container startup, page operations, and storage can add time, so this is not a guaranteed wall-clock SLA. The result is a limited sample; **Run full audit** starts broader coverage. Optimization reuses the baseline's exact tasks and limits.
+
+Cloud and local swarms keep up to eight attempts in flight, filling a slot whenever an attempt finishes. Short tasks start first, interleaved across models and agent kinds. A slow attempt no longer stalls an entire batch; the existing internal spending allowance still applies. Model-client retries do not multiply the runner's retry policy.
 
 The demo is a fake GPU-cloud website with 10 deliberate agent traps and 14 tasks. See [demo_site/TRAPS.md](demo_site/TRAPS.md). A site can supply an `abtract-tasks.json` manifest; otherwise Gemini generates tasks, with a generic navigation fallback when no key is configured.
 
@@ -74,6 +78,8 @@ The product and demo use the same Modal deployment, with two separate HTTPS endp
    uv run modal deploy deploy.py
    uv run python scripts/import_demo_site.py --modal
    ```
+
+   Run the deploy command again after code changes: pushing to GitHub does not update the running Modal app. New jobs use the deployed code; an existing worker keeps its original execution plan.
 
    To replace an existing `abtract-secrets` secret, add `--force` to the secret command and redeploy. Modal's [secret CLI reference](https://modal.com/docs/cli/latest/secret) describes this behavior.
 

@@ -40,6 +40,7 @@ class Task(BaseModel):
     expected_event: str | None = None             # for kind=action: SiteEvent.name that must be recorded
     expected_event_match: dict[str, Any] = {}     # subset of SiteEvent.payload that must match
     max_steps: int = 15
+    timeout_s: float | None = Field(default=None, gt=0, le=600)
     tags: list[str] = []
     trap: str | None = None                       # for the demo: which agent-trap this task exercises
 
@@ -186,6 +187,7 @@ class RunSummary(BaseModel):
     site_id: str
     site_version: str
     site_url: str
+    scan_mode: Literal["quick", "full"] = "full"
     created_at: float = Field(default_factory=time.time)
     finished_at: float | None = None
     tasks: list[Task] = []
@@ -214,9 +216,24 @@ class PreviewAttempt(BaseModel):
     reason: str = ""
 
 
+class ActiveAttempt(BaseModel):
+    task_id: str
+    prompt: str
+    model_id: str
+    agent_kind: AgentKind
+
+
+class PageSummary(BaseModel):
+    title: str = ""
+    heading: str = ""
+    links: int = 0
+    forms: int = 0
+
+
 class JobPreview(BaseModel):
     """Small, provisional snapshot; no traces or additional LLM inference."""
     site_version: str = "v0"
+    page: PageSummary | None = None
     pages_scanned: int = 0
     observations: list[str] = Field(default_factory=list)
     task_sample: list[str] = Field(default_factory=list)
@@ -228,6 +245,7 @@ class JobPreview(BaseModel):
     skipped: int = 0
     findings: list[str] = Field(default_factory=list)
     recent: list[PreviewAttempt] = Field(default_factory=list)
+    active: list[ActiveAttempt] = Field(default_factory=list)
     updated_at: float = Field(default_factory=time.time)
 
 
@@ -240,6 +258,7 @@ class Job(BaseModel):
     """
     id: str = Field(default_factory=lambda: new_id("job"))
     type: JobType
+    scan_mode: Literal["quick", "full"] = "full"  # old saved jobs retain their full-audit meaning
     status: JobStatus = "queued"
     phase: str = ""                       # human-readable, e.g. "Mirroring site", "Running swarm"
     progress_done: int = 0

@@ -30,6 +30,6 @@ uv run modal deploy deploy.py
 uv run python scripts/import_demo_site.py --modal
 ```
 
-Add `--force` to the secret command when replacing an existing secret, then redeploy. Open the printed dashboard URL and sign in as `abtract` with the password from `.env.modal`. The demo lives at `<site URL>/s/demo/v0/`; the product's **Try with the demo site** button fills that URL in. For the first live run, select the two configured Flash models and Text only, then add DOM and Vision after reviewing results and usage.
+Add `--force` to the secret command when replacing an existing secret, then redeploy. Open the printed dashboard URL and sign in as `abtract` with the password from `.env.modal`. The demo lives at `<site URL>/s/demo/v0/`; the product's **Try with the demo site** button fills that URL in. Start with the default **Quick scan** (one configured Flash model, three short tasks, Text + DOM). Choose **Full audit** from the results to test the broader model and agent grid. Pushing to GitHub alone does not update Modal; redeploy after changing the code.
 
 Sources: [Modal endpoint API and authentication](https://modal.com/docs/guide/endpoints), [Shared Endpoints](https://modal.com/docs/guide/shared-endpoints), [Dedicated Endpoint billing](https://modal.com/docs/guide/dedicated-endpoints).

@@ -64,19 +64,18 @@ def test_loop_persists_exact_baseline(data):
     assert job.url == "https://original.example/"
 
 
-def test_cloud_budget_stops_new_batches(data, monkeypatch):
+def test_cloud_budget_stops_new_submissions(data, monkeypatch):
     tasks = [Task(id=f"t{i}", kind="answer", prompt="heading?", expected_answer="Fixture") for i in range(5)]
     run = RunSummary(site_id="demo", site_version="v0", site_url="http://example/")
     calls = []
 
-    def fake_map(payloads, **kwargs):
-        calls.extend(payloads)
-        for p in payloads:
-            ep = runner.error_episode(p, "test model result")
-            ep.cost_usd = 0.6
-            yield ep.model_dump(mode="json")
+    def fake_remote(p):
+        calls.append(p)
+        ep = runner.error_episode(p, "test model result")
+        ep.cost_usd = 1.1
+        return ep.model_dump(mode="json")
 
-    monkeypatch.setattr(runner, "run_episode", SimpleNamespace(map=fake_map))
+    monkeypatch.setattr(runner, "run_episode", SimpleNamespace(remote=fake_remote))
     eps = runner._fan_out_modal(runner.build_payloads(run, tasks, ["mock"], ["text"]), None,
                                  budget_usd=1, concurrency=2)
     assert len(calls) == 2  # in-flight calls finish; the other three never start

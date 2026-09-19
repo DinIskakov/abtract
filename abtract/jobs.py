@@ -26,13 +26,13 @@ import modal
 from abtract import store
 from abtract.hosting import urls
 from abtract.intake.mirror import mirror_to_store
-from abtract.intake.tasks import pick_tasks
+from abtract.intake.tasks import pick_quick_tasks, pick_tasks
 from abtract.modal_app import APP_NAME, app, base_image, secrets, volumes
 from abtract.models.registry import DEFAULT_SWARM, get_model
-from abtract.optimizer.findings import write_findings
-from abtract.optimizer.preview import attempt, inspect_page, update_attempts
+from abtract.optimizer.findings import rule_based_findings, write_findings
+from abtract.optimizer.preview import attempt, inspect_page, summarize_page, update_attempts
 from abtract.optimizer.rewrite import optimize_site
-from abtract.schemas import AgentKind, Episode, Job, JobPreview, PreviewAttempt, RunSummary, Task
+from abtract.schemas import ActiveAttempt, AgentKind, Episode, Job, JobPreview, PreviewAttempt, RunSummary, Task
 from abtract.swarm.runner import run_swarm, serve_site_locally
 
 DEFAULT_AGENTS = [AgentKind.text, AgentKind.dom, AgentKind.vision]
@@ -84,6 +84,7 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
     total = _grid_size(tasks, model_ids, agent_kinds)
     previous = job.live_preview
     job.live_preview = JobPreview(site_version=version, total=total, task_sample=[t.prompt for t in tasks[:4]],
+                                  page=previous.page if previous and previous.site_version == version else None,
                                   pages_scanned=previous.pages_scanned if previous and previous.site_version == version else 0,
                                   observations=previous.observations if previous and previous.site_version == version else [])
     _progress(job, phase, 0, total,
@@ -100,10 +101,19 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
     results: list[PreviewAttempt] = []
     task_of = {t.id: t for t in tasks}
 
+    def on_start(payloads: list[dict[str, Any]]) -> None:
+        for payload in payloads:
+            task = payload["task"]
+            job.live_preview.active.append(ActiveAttempt(task_id=task["id"], prompt=task["prompt"],
+                                                        model_id=payload["model_id"], agent_kind=payload["agent_kind"]))
+        _progress(job)
+
     def on_episode(ep: Episode) -> None:
         counter["n"] += 1
         job.swarm_spent_usd += ep.cost_usd
         results.append(attempt(ep, task_of))
+        job.live_preview.active = [a for a in job.live_preview.active
+                                   if (a.task_id, a.model_id, a.agent_kind) != (ep.task_id, ep.model_id, ep.agent_kind)]
         update_attempts(job.live_preview, results)
         status = "ok  " if ep.success else f"FAIL[{ep.failure_mode}]"
         kind = ep.agent_kind.value if hasattr(ep.agent_kind, "value") else ep.agent_kind
@@ -114,9 +124,11 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
     kwargs: dict[str, Any] = {}
     if job.budget_usd is not None:
         kwargs["budget_usd"] = max(0.0, job.budget_usd - job.swarm_spent_usd)
+    if job.scan_mode == "quick":
+        kwargs["use_llm_judge"] = False
     try:
         run = run_swarm(site_id, version, tasks, model_ids, agent_kinds, site_url=site_url, local=local,
-                        on_episode=on_episode, **kwargs)
+                        on_episode=on_episode, on_start=on_start, scan_mode=job.scan_mode, **kwargs)
     finally:
         try:
             stop()
@@ -133,7 +145,8 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
 def _findings_phase(job: Job, run: RunSummary, tasks: list[Task], baseline: RunSummary | None = None) -> None:
     _progress(job, "Writing findings")
     episodes = store.load_episodes(run.run_id)
-    job.findings = write_findings(run, episodes, tasks, baseline=baseline)
+    report = rule_based_findings if job.scan_mode == "quick" else write_findings
+    job.findings = report(run, episodes, tasks, baseline=baseline)
     _progress(job, log_line="findings written")
 
 
@@ -150,6 +163,8 @@ def _run_intake(job: Job, *, local: bool) -> None:
         nonlocal last_page_update
         preview = job.live_preview
         preview.pages_scanned += 1
+        if preview.page is None:
+            preview.page = summarize_page(html)
         preview.observations = (preview.observations + inspect_page(path, html))[:8]
         if preview.pages_scanned == 1 or time.monotonic() - last_page_update >= 1:
             _progress(job, log_line=f"Read {preview.pages_scanned} page(s); latest: {path}")
@@ -168,7 +183,10 @@ def _run_intake(job: Job, *, local: bool) -> None:
         _progress(job, log_line=f"  mirror: {e}")
 
     _progress(job, "Choosing tasks")
-    tasks, how = pick_tasks(sv.site_id, sv.version, source_url=job.url)
+    if job.scan_mode == "quick":
+        tasks, how = pick_quick_tasks(sv.site_id, sv.version), "quick scan; up to 6 steps per attempt"
+    else:
+        tasks, how = pick_tasks(sv.site_id, sv.version, source_url=job.url)
     _progress(job, log_line=f"{len(tasks)} tasks ({how}): " + ", ".join(t.id for t in tasks[:8])
               + (" ..." if len(tasks) > 8 else ""))
 
@@ -190,10 +208,6 @@ def _run_loop(job: Job, *, local: bool) -> None:
     if not store.site_dir(site_id, version).is_dir():
         raise FileNotFoundError(f"site version {site_id}/{version} is not in the store")
     tasks = store.load_site_tasks(site_id)
-    if not tasks:
-        tasks, how = pick_tasks(site_id, version, source_url=job.url)
-        _progress(job, log_line=f"{len(tasks)} tasks ({how})")
-
     # baseline: the run the loop starts from (the intake run, normally)
     baseline: RunSummary | None = None
     if job.run_ids:
@@ -204,6 +218,9 @@ def _run_loop(job: Job, *, local: bool) -> None:
     if baseline is None or baseline.site_id != site_id or baseline.site_version != version:
         baseline = _latest_run_for(site_id, version)
     if baseline is None:
+        if not tasks:
+            tasks, how = pick_tasks(site_id, version, source_url=job.url)
+            _progress(job, log_line=f"{len(tasks)} tasks ({how})")
         baseline = _run_swarm_phase(job, site_id, version, tasks, phase=f"Running swarm on {version} (baseline)", local=local)
     else:
         job.site_version = version
@@ -211,6 +228,11 @@ def _run_loop(job: Job, *, local: bool) -> None:
                                 f"({100 * baseline.overall.success_rate:.0f}% success)")
 
     last_run = baseline
+    # The baseline owns the evaluation task set, including quick-scan limits.
+    # Mixing a quick baseline with full-site tasks would produce an invalid A/B comparison.
+    if baseline.tasks:
+        tasks = baseline.tasks
+    job.scan_mode = baseline.scan_mode
     job.baseline_run_id = baseline.run_id
     _progress(job, log_line=f"comparison baseline: {baseline.run_id}")
     for i in range(max(1, job.iterations)):

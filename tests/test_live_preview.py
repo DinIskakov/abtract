@@ -6,9 +6,16 @@ from fastapi.testclient import TestClient
 from abtract import jobs, store
 from abtract.config import settings
 from abtract.dashboard.app import create_app
-from abtract.optimizer.preview import attempt, inspect_page, update_attempts
+from abtract.optimizer.preview import attempt, inspect_page, summarize_page, update_attempts
 from abtract.schemas import Episode, Job, JobPreview, RunSummary, Task
 from tests.test_jobs import TASKS, _fake_mirror_to_store, make_fake_run_swarm
+
+
+def test_homepage_summary_is_useful_even_without_obstacles():
+    html = b'<title>Example</title><h1>Build things</h1><a href="/">Home</a><form></form>'
+    page = summarize_page(html)
+    assert (page.title, page.heading, page.links, page.forms) == ("Example", "Build things", 1, 1)
+    assert not inspect_page("index.html", html)
 
 
 def test_initial_checks_use_html_evidence_and_respect_labels():
@@ -71,13 +78,16 @@ def test_api_publishes_page_checks_and_attempts_before_final_report(tmp_path, mo
 
         real_fake_swarm = make_fake_run_swarm([])
 
-        def swarm(*args, on_episode, **kwargs):
+        def swarm(*args, on_episode, on_start, **kwargs):
             assert snapshot()["total"] == len(TASKS)
+            on_start([{"task": t.model_dump(), "model_id": "mock", "agent_kind": "text"} for t in TASKS])
+            assert len(snapshot()["active"]) == len(TASKS)
             def completed(ep):
                 on_episode(ep)
                 preview = snapshot()
                 assert preview["recent"][0]["episode_id"] == ep.id
                 assert preview["findings"]
+                assert all(a["task_id"] != ep.task_id for a in preview["active"])
             return real_fake_swarm(*args, on_episode=completed, **kwargs)
 
         monkeypatch.setattr(jobs, "mirror_to_store", mirror)

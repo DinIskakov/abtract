@@ -3,7 +3,7 @@
     run_episode_sync(payload)   one episode: run the agent, judge it, save it. Never raises.
     run_episode                 the same thing as a Modal function (browser_image, so dom/vision agents work).
     estimate_run_cost(...)      what a grid will roughly cost before anything is launched.
-    run_swarm(...)              build the grid, fan out (ThreadPoolExecutor or run_episode.map), aggregate, save.
+    run_swarm(...)              build the grid, fan out through a bounded rolling pool, aggregate, save.
                                 `budget_usd` raises BudgetExceeded up front and (locally) stops submitting when spent.
     serve_site_locally()        serve the store's site versions on a free local port for --local runs.
 
@@ -16,10 +16,11 @@ import socket
 import threading
 import time
 import traceback
+from collections import deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from abtract import store
 from abtract.metrics.score import aggregate, judge
@@ -28,6 +29,7 @@ from abtract.models.registry import get_model
 from abtract.schemas import AgentKind, Episode, RunSummary, Task
 
 OnEpisode = Callable[[Episode], None]
+OnStart = Callable[[list[dict[str, Any]]], None]
 log = logging.getLogger("abtract.swarm")
 
 # Pre-run estimate defaults. Agent traffic is input-heavy: every step re-sends the system prompt, the task and a
@@ -132,13 +134,15 @@ def save_run_remote(run: dict) -> str:
 def build_payloads(run: RunSummary, tasks: list[Task], model_ids: list[str], agent_kinds: list[AgentKind | str],
                    *, use_llm_judge: bool = True) -> list[dict[str, Any]]:
     payloads: list[dict[str, Any]] = []
-    for model_id in model_ids:
-        spec = get_model(model_id)  # KeyError early for typos
+    specs = {model_id: get_model(model_id) for model_id in model_ids}
+    # Short checks start first; interleave models and agent kinds so one slow group
+    # cannot hide the rest of the site's results. Every original task still runs.
+    for task in sorted(tasks, key=lambda t: (t.max_steps, t.kind == "action")):
         for kind in agent_kinds:
             kind = AgentKind(kind)
-            if kind == AgentKind.vision and not spec.supports_vision:
-                continue
-            for task in tasks:
+            for model_id, spec in specs.items():
+                if kind == AgentKind.vision and not spec.supports_vision:
+                    continue
                 payloads.append({
                     "run_id": run.run_id,
                     "site_id": run.site_id,
@@ -201,20 +205,16 @@ def estimate_run_cost(
     }
 
 
-def _key(p: dict[str, Any]) -> tuple[str, str, str]:
-    return (p["model_id"], p["agent_kind"], _task_of(p).id)
+def _fan_out(payloads: list[dict[str, Any]], concurrency: int, on_episode: OnEpisode | None,
+             *, execute: Callable[[dict[str, Any]], dict], budget_usd: float | None = None,
+             on_start: OnStart | None = None) -> list[Episode]:
+    """Keep a bounded number in flight, refilling after each completion.
 
-
-def _ep_key(e: Episode) -> tuple[str, str, str]:
-    return (e.model_id, AgentKind(e.agent_kind).value, e.task_id)
-
-
-def _fan_out_local(payloads: list[dict[str, Any]], concurrency: int, on_episode: OnEpisode | None,
-                   budget_usd: float | None = None) -> list[Episode]:
-    """Run payloads on a thread pool, at most `concurrency` in flight. With a budget, stop submitting once the
-    episodes that came back have cost more than it; whatever was never submitted becomes an error episode."""
+    Only execution runs on pool threads. All persistence, budget accounting and
+    progress callbacks happen on the coordinator thread, for local and cloud runs.
+    """
     episodes: list[Episode] = []
-    pending = list(payloads)
+    pending = deque(payloads)
     in_flight: dict[Any, dict[str, Any]] = {}
     spent = 0.0
     width = max(1, concurrency)
@@ -224,9 +224,13 @@ def _fan_out_local(payloads: list[dict[str, Any]], concurrency: int, on_episode:
 
     with ThreadPoolExecutor(max_workers=width) as pool:
         def submit_more() -> None:
+            scheduled = []
             while pending and len(in_flight) < width and not over_budget():
-                p = pending.pop(0)
-                in_flight[pool.submit(run_episode_sync, p)] = p
+                p = pending.popleft()
+                in_flight[pool.submit(execute, p)] = p
+                scheduled.append(p)
+            if scheduled and on_start:
+                on_start(scheduled)
 
         submit_more()
         while in_flight:
@@ -237,7 +241,7 @@ def _fan_out_local(payloads: list[dict[str, Any]], concurrency: int, on_episode:
                     ep = Episode(**fut.result())
                 except Exception as e:  # noqa: BLE001
                     ep = error_episode(p, e)
-                    store.save_episode(ep)
+                store.save_episode(ep)
                 spent += ep.cost_usd
                 episodes.append(ep)
                 if on_episode:
@@ -256,53 +260,19 @@ def _fan_out_local(payloads: list[dict[str, Any]], concurrency: int, on_episode:
     return episodes
 
 
-def _modal_batch(payloads: list[dict[str, Any]], on_episode: OnEpisode | None) -> list[Episode]:
-    episodes: list[Episode] = []
-    errors: list[BaseException] = []
-    for r in run_episode.map(payloads, order_outputs=False, return_exceptions=True):
-        if isinstance(r, BaseException):
-            errors.append(r)
-            continue
-        ep = Episode(**r)
-        store.save_episode(ep)  # local mirror of what the container wrote to the Volume
-        episodes.append(ep)
-        if on_episode:
-            on_episode(ep)
-    # exceptions come back unordered, so pair them with whichever payloads produced no episode
-    seen = {_ep_key(e) for e in episodes}
-    missing = [p for p in payloads if _key(p) not in seen]
-    for i, p in enumerate(missing):
-        exc = errors[i] if i < len(errors) else RuntimeError("no result returned from Modal")
-        ep = error_episode(p, exc)
-        store.save_episode(ep)
-        episodes.append(ep)
-        if on_episode:
-            on_episode(ep)
-    return episodes
+def _fan_out_local(payloads: list[dict[str, Any]], concurrency: int, on_episode: OnEpisode | None,
+                   budget_usd: float | None = None, on_start: OnStart | None = None) -> list[Episode]:
+    return _fan_out(payloads, concurrency, on_episode, execute=run_episode_sync,
+                    budget_usd=budget_usd, on_start=on_start)
 
 
 def _fan_out_modal(payloads: list[dict[str, Any]], on_episode: OnEpisode | None,
-                   budget_usd: float | None = None, concurrency: int = 8) -> list[Episode]:
-    """Bound cloud fan-out and stop scheduling new batches when the episode allowance is spent.
-
-    Already running calls can exceed the allowance; this is not a provider billing cap.
-    """
-    episodes: list[Episode] = []
-    spent = 0.0
-    width = max(1, concurrency)
-    for offset in range(0, len(payloads), width):
-        if budget_usd is not None and spent >= budget_usd:
-            for payload in payloads[offset:]:
-                ep = error_episode(payload, f"budget exhausted: ${spent:.4f} spent of ${budget_usd:.2f}")
-                store.save_episode(ep)
-                episodes.append(ep)
-                if on_episode:
-                    on_episode(ep)
-            break
-        batch = _modal_batch(payloads[offset:offset + width], on_episode)
-        episodes.extend(batch)
-        spent += sum(ep.cost_usd for ep in batch)
-    return episodes
+                   budget_usd: float | None = None, concurrency: int = 8,
+                   on_start: OnStart | None = None) -> list[Episode]:
+    # Each remote call owns its payload, including when Modal raises. A slow call
+    # occupies one slot instead of holding up an entire batch.
+    return _fan_out(payloads, concurrency, on_episode, execute=run_episode.remote,
+                    budget_usd=budget_usd, on_start=on_start)
 
 
 def run_swarm(
@@ -317,13 +287,15 @@ def run_swarm(
     concurrency: int = 8,
     run_id: str | None = None,
     on_episode: OnEpisode | None = None,
+    on_start: OnStart | None = None,
     use_llm_judge: bool = True,
     budget_usd: float | None = None,
+    scan_mode: Literal["quick", "full"] = "full",
 ) -> RunSummary:
     """Run every (model x agent x task) episode against one hosted site version and return the aggregated run.
 
     `budget_usd`: raise BudgetExceeded before launching anything when the estimate is above it. Locally, also stop
-    submitting episodes/batches once actual spend reaches it (the rest are recorded as errors).
+    submitting episodes once actual spend reaches it (the rest are recorded as errors).
     In-flight calls may overshoot; the allowance excludes Gemini helper calls and hosting/compute.
     """
     kinds = [AgentKind(k) for k in agent_kinds]
@@ -334,7 +306,7 @@ def run_swarm(
         raise BudgetExceeded(estimate, budget_usd)
 
     run = RunSummary(
-        site_id=site_id, site_version=site_version, site_url=site_url,
+        site_id=site_id, site_version=site_version, site_url=site_url, scan_mode=scan_mode,
         tasks=list(tasks), model_ids=list(model_ids), agent_kinds=kinds,
         **({"run_id": run_id} if run_id else {}),
     )
@@ -344,9 +316,9 @@ def run_swarm(
         raise ValueError("empty swarm grid (no tasks, or no model supports the requested agents)")
 
     if local:
-        episodes = _fan_out_local(payloads, concurrency, on_episode, budget_usd=budget_usd)
+        episodes = _fan_out_local(payloads, concurrency, on_episode, budget_usd=budget_usd, on_start=on_start)
     else:
-        episodes = _fan_out_modal(payloads, on_episode, budget_usd=budget_usd, concurrency=concurrency)
+        episodes = _fan_out_modal(payloads, on_episode, budget_usd=budget_usd, concurrency=concurrency, on_start=on_start)
 
     spent = sum(e.cost_usd for e in episodes)
     if budget_usd is not None and spent > budget_usd:
