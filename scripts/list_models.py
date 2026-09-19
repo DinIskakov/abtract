@@ -45,8 +45,10 @@ def main() -> None:
     if names:
         unmatched = [m.id for m in MODELS.values() if m.provider == "modal" and resolve_modal_model(m) not in names]
         if unmatched:
-            print(f"\nNot matched to any gateway name (create the endpoint with `modal endpoint create --model <id>` or "
-                  f"set ABTRACT_MODEL_<ID> in .env): {', '.join(unmatched)}")
+            print(f"\nNot matched to any gateway name: {', '.join(unmatched)}. "
+                  "Check the endpoint URL/model name shown at https://modal.com/endpoints and set "
+                  "MODAL_INFERENCE_BASE_URL / ABTRACT_MODEL_<ID> in .env. If Shared Endpoints are unavailable, "
+                  "use --models gemini-flash with GEMINI_API_KEY. Dedicated endpoint creation uses compute billing.")
 
 
 if __name__ == "__main__":

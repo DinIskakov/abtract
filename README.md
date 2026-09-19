@@ -50,14 +50,16 @@ Mock validates the workflow without API spending: its agents give up by default 
 
 The product and demo use the same Modal deployment, with two separate HTTPS endpoints and a shared `abtract-data` Volume.
 
-1. Authenticate and create an inference token:
+1. Authenticate with Modal. Create an inference proxy token only if you will use Modal for model inference:
 
    ```bash
    uv run modal setup
    uv run modal workspace proxy-tokens create
    ```
 
-2. In the Modal dashboard **Endpoints** tab, create **Shared Endpoints** for the models you plan to test. Start with DeepSeek V4.1 Flash and GLM 5.3 Flash, the two default models. Copy the endpoint's API base URL/model name if it differs from the supplied defaults. Shared Endpoints are managed and billed per token; `modal endpoint create` examples on model library pages refer to dedicated endpoints and are a different cost model. See [Modal Shared Endpoints](https://modal.com/docs/guide/shared-endpoints).
+2. For Modal inference, open the [Endpoints page](https://modal.com/endpoints) while signed in. Modal's [Shared Endpoints documentation](https://modal.com/docs/guide/shared-endpoints) describes creating them from that page; this has not been verified in every workspace's dashboard. If a Shared option is available, start with DeepSeek V4.1 Flash and GLM 5.3 Flash, the two default models. Copy the supplied API base URL/model name if it differs from our defaults. Shared Endpoints are billed per token; `modal endpoint create` examples on library pages create dedicated endpoints with a different cost model.
+
+   **If Shared Endpoints are absent:** continue hosting the app on Modal and use Gemini for inference. No Shared Endpoint or Modal inference proxy token is needed for this path. Fill in `GEMINI_API_KEY`, keep `ABTRACT_OPTIMIZER_MODEL` unset, and after deployment deselect DeepSeek and GLM on the landing page and select only **Gemini**. Text, DOM, and vision agents can all use it, as can the optimizer. CLI runs use `--models gemini-flash`. This tests multiple agent kinds with one model; it does not provide the planned comparison across model providers. The real Gemini integration still needs a live API test.
 
 3. Prepare a cloud-only secret file:
 
@@ -65,7 +67,7 @@ The product and demo use the same Modal deployment, with two separate HTTPS endp
    cp .env.modal.example .env.modal
    ```
 
-   Fill in `MODAL_PROXY_TOKEN`, `GEMINI_API_KEY`, and a strong `ABTRACT_DASHBOARD_PASSWORD`. The product requires that password when running on Modal. Sign in with username **abtract**. Keep `.env.modal` private; Git ignores it. Do not upload your local `.env`, whose local storage path would override the cloud Volume path.
+   Fill in `GEMINI_API_KEY` and a strong `ABTRACT_DASHBOARD_PASSWORD`; also fill in `MODAL_PROXY_TOKEN` if using Modal inference. The product requires that password when running on Modal. Sign in with username **abtract**. Keep `.env.modal` private; Git ignores it. Do not upload your local `.env`, whose local storage path would override the cloud Volume path.
 
 4. Create the secret, deploy the app, and upload the demo:
 

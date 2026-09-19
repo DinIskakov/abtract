@@ -2,8 +2,9 @@
 
 Every row in SHARED_ENDPOINT_MODELS was read from its `source_url` on modal.com/library on CHECKED_ON. Only models
 whose library page shows a Shared Endpoint (pay per token) price are listed; prices are USD per 1M tokens and the
-cached-prompt discount is recorded but not used for cost estimates (they err high). `modal_id` is the exact string
-for `modal endpoint create --model <modal_id>` and the default OpenAI `model` field (see llm.resolve_modal_model).
+cached-prompt discount is recorded but not used for cost estimates (they err high). `modal_id` is the library ID
+and default API model name; use the actual endpoint's model name if different (see llm.resolve_modal_model).
+Library availability does not verify that a particular workspace exposes Shared Endpoint creation.
 
 To add a model: append a row with its library page as `source_url`, then `uv run pytest tests/test_models.py`.
 """
