@@ -199,3 +199,47 @@ def test_generate_tasks_with_patched_chat(site, monkeypatch):
     tasks = task_gen.generate_tasks("demo", "v0", n=2)
     assert [t.id for t in tasks] == ["t1", "t2"]
     assert "waitlist_submit" in seen["user"] and "pricing.html" in seen["user"]
+
+
+def test_validate_tasks_requires_site_evidence():
+    raw = [
+        {"id": "missing_action", "kind": "action", "prompt": "Buy", "expected_event": "checkout"},
+        {"id": "missing_fact", "kind": "answer", "prompt": "Price?", "expected_answer": "$99.99",
+         "answer_aliases": [""]},
+        {"id": "real", "kind": "answer", "prompt": "Headline?", "expected_answer": "Build & ship things"},
+    ]
+    files = {"index.html": "<h1>Build &amp; <em>ship</em> things</h1>", "abtract-tasks.json": json.dumps(raw)}
+    assert [t.id for t in task_gen.validate_tasks(raw, files, n=8)] == ["real"]
+
+
+def test_generate_tasks_does_not_require_unsupported_task_kinds(site, monkeypatch):
+    root = store.site_dir("plain", "v0")
+    root.mkdir(parents=True)
+    (root / "index.html").write_text("<h1>Build things</h1>")
+    (root / "abtract-tasks.json").write_text(json.dumps([
+        {"kind": "answer", "prompt": "Secret?", "expected_answer": "invented-manifest-fact"},
+    ]))
+    seen = {}
+
+    def fake_chat(spec, messages, **kw):
+        seen["messages"] = messages
+        return LLMResponse(text=json.dumps({"tasks": [
+            {"kind": "action", "prompt": "Buy", "expected_event": "checkout"},
+            {"kind": "answer", "prompt": "Headline?", "expected_answer": "Build things"},
+        ]}), usage=Usage())
+
+    monkeypatch.setattr(task_gen, "chat", fake_chat)
+    tasks = task_gen.generate_tasks("plain", "v0", n=8)
+    assert len(tasks) == 1 and tasks[0].kind.value == "answer"
+    assert "only where supported" in seen["messages"][-1].content
+    assert "invented-manifest-fact" not in seen["messages"][-1].content
+
+
+def test_task_validation_reads_past_model_file_cap(site):
+    root = store.site_dir("long", "v0")
+    root.mkdir(parents=True)
+    (root / "index.html").write_text("<p>padding</p>" * 1200 + "<p>A fact near the end</p>")
+    tasks = task_gen.validate_tasks([
+        {"kind": "answer", "prompt": "Fact?", "expected_answer": "A fact near the end"},
+    ], task_gen.task_site_files(root), n=8)
+    assert len(tasks) == 1

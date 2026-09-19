@@ -75,7 +75,8 @@ def _fake_mirror_to_store(url, *, site_id=None, **kw):
     d = store.site_dir(site_id, "v0")
     d.mkdir(parents=True, exist_ok=True)
     (d / "index.html").write_text("<html><body><a href='pricing.html'>Pricing</a></body></html>")
-    (d / "pricing.html").write_text("<html><body>$3.95</body></html>")
+    (d / "pricing.html").write_text("<html><body>$3.95<form action='api/waitlist_submit' method='post'>"
+                                    "<input name='email'><button>Join</button></form></body></html>")
     import json
 
     (d / "abtract-tasks.json").write_text(json.dumps([t.model_dump(mode="json") for t in TASKS]))

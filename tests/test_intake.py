@@ -232,16 +232,56 @@ def test_mirror_to_store_and_site_provided_tasks(demo_server, tmp_store):
     assert site_id_for_url(demo_server) != sv.site_id
 
 
-def test_pick_tasks_generic_fallback(tmp_store):
+def test_pick_tasks_skips_missing_pricing_page(tmp_store):
     d = store.site_dir("plain", "v0")
     d.mkdir(parents=True)
     (d / "index.html").write_text("<html><body><a href='pricing.html'>Pricing</a></body></html>")
     tasks, how = pick_tasks("plain", "v0", source_url="https://plain.example/")
-    assert how == "generic"
-    assert 5 <= len(tasks) <= 6
-    assert all(t.kind.value == "url" and t.trap == "generic" and t.max_steps == 10 for t in tasks)
-    assert any(re.search(t.expected_url_pattern, "pricing.html") for t in tasks)
-    assert store.load_site_tasks("plain") is not None
+    assert how == "site-derived"
+    assert [t.id for t in tasks] == ["discovered_home"]
+    assert not any(re.search(t.expected_url_pattern, "pricing.html") for t in tasks)
+    assert store.load_site_tasks("plain") == tasks
+
+
+def test_pick_tasks_uses_captured_content_and_nested_links(tmp_store):
+    d = store.site_dir("plain", "v0")
+    (d / "guides").mkdir(parents=True)
+    (d / "index.html").write_text('<h1>Build &amp; ship</h1><a href="guides/">Guides</a>'
+                                 '<a href="pricing.html">Pricing</a><a href="https://outside.example">External</a>')
+    (d / "guides/index.html").write_text('<h1>Guides</h1><a href="../tutorial">Tutorial</a>'
+                                        '<a href="../index.html">Home</a>')
+    (d / "tutorial.html").write_text("<h1>Tutorial</h1>")
+    tasks, how = pick_tasks("plain", "v0")
+    assert how == "site-derived" and len(tasks) == 3
+    assert tasks[0].expected_answer == "Build & ship"
+    navigation = tasks[1:]
+    assert any(re.search(t.expected_url_pattern, "guides/") for t in navigation)
+    assert any(re.search(t.expected_url_pattern, "tutorial") for t in navigation)
+    assert not any(re.search(t.expected_url_pattern, "pricing.html") for t in navigation)
+
+
+def test_pick_tasks_validates_manifest_against_site(tmp_store):
+    d = store.site_dir("plain", "v0")
+    d.mkdir(parents=True)
+    (d / "index.html").write_text("<h1>Build things</h1>")
+    raw = [
+        {"id": "missing_page", "kind": "url", "prompt": "Pricing?", "expected_url_pattern": "^pricing"},
+        {"id": "made_up_fact", "kind": "answer", "prompt": "Price?", "expected_answer": "$99.99"},
+        {"id": "made_up_action", "kind": "action", "prompt": "Buy", "expected_event": "checkout"},
+        {"id": "real", "kind": "answer", "prompt": "Headline?", "expected_answer": "Build things"},
+    ]
+    (d / "abtract-tasks.json").write_text(json.dumps(raw))
+    tasks, how = pick_tasks("plain", "v0")
+    assert how == "site-provided" and [t.id for t in tasks] == ["real"]
+
+    (d / "abtract-tasks.json").write_text(json.dumps(raw[:-1]))
+    tasks, how = pick_tasks("plain", "v0")
+    assert how == "site-derived" and [t.id for t in tasks] == ["discovered_headline"]
+
+
+def test_pick_tasks_does_not_invent_homepage_when_capture_is_missing(tmp_store):
+    with pytest.raises(FileNotFoundError, match="no captured homepage"):
+        pick_tasks("missing", "v0")
 
 
 def test_pick_tasks_gemini_failure_falls_through(tmp_store, monkeypatch):
@@ -257,4 +297,4 @@ def test_pick_tasks_gemini_failure_falls_through(tmp_store, monkeypatch):
     d.mkdir(parents=True)
     (d / "index.html").write_text("<html><body>hi</body></html>")
     tasks, how = pick_tasks("plain2", "v0", source_url=None)
-    assert how == "generic" and tasks
+    assert how == "site-derived" and [t.id for t in tasks] == ["discovered_home"]

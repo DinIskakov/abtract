@@ -1,5 +1,6 @@
 """Fast scans must remain bounded, checkable, and comparable when optimized."""
 import json
+import re
 import time
 from types import SimpleNamespace
 
@@ -33,8 +34,21 @@ def test_quick_tasks_use_real_homepage_links(tmp_path, monkeypatch):
     (root / "pricing.html").write_text("Plans")
     tasks = pick_quick_tasks("site", "v0")
     assert len(tasks) == 2 and tasks[0].expected_answer == "Build things"
-    assert tasks[1].expected_url_pattern == r"^pricing\.html(?:[?#].*)?$"
+    assert re.search(tasks[1].expected_url_pattern, "pricing.html")
+    assert not re.search(tasks[1].expected_url_pattern, "missing.html")
     assert "Pricing" in tasks[1].prompt
+
+
+def test_quick_tasks_reject_stale_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    root = store.site_dir("site", "v0")
+    root.mkdir(parents=True)
+    (root / "index.html").write_text("<h1>Build things</h1>")
+    (root / "abtract-tasks.json").write_text(json.dumps([
+        {"id": "stale", "kind": "url", "prompt": "Find pricing", "expected_url_pattern": "^pricing"},
+    ]))
+    tasks = pick_quick_tasks("site", "v0")
+    assert [t.id for t in tasks] == ["quick_headline"]
 
 
 def test_quick_job_avoids_task_generation_and_final_llm_report(tmp_path, monkeypatch):

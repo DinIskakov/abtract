@@ -1,4 +1,4 @@
-"""Gemini reads a site version and writes checkable tasks of all three kinds.
+"""Gemini reads a site version and writes checkable tasks for its supported capabilities.
 
     generate_tasks(site_id, version, n=8) -> list[Task]
 
@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import json
 import re
+from html import unescape
 from pathlib import Path
 from typing import Any
+
+from bs4 import BeautifulSoup
 
 from abtract import store
 from abtract.models.llm import ChatMessage, chat, extract_json  # noqa: F401  (patchable)
@@ -22,10 +25,14 @@ from abtract.schemas import Task, TaskKind
 GENERATOR_MODEL = "gemini-flash"
 _API_RE = re.compile(r"""(?:action\s*=\s*|fetch\(\s*|url\s*[:=]\s*|open\(\s*['"][A-Z]+['"]\s*,\s*)['"]([^'"]*api/[A-Za-z0-9_\-/]+)['"]""")
 _NAME_RE = re.compile(r"""<(?:input|select|textarea)[^>]*\bname\s*=\s*['"]([^'"]+)['"]""", re.I)
+_EVENT_RE = re.compile(r"""\bpostEvent\(\s*['"]([A-Za-z0-9_\-/]+)['"]""")
 
 RULES = """\
 You write evaluation tasks for AI web agents against the static website given below. A task is something a real user
 would ask an assistant to do on this site. Every task must be automatically checkable:
+Use only capabilities evidenced by the supplied site files. Do not assume a marketing site has pricing,
+documentation, signup, or contact pages. Omit tasks whose destination, fact, or recorded action is absent.
+Choose the mix of task kinds from what this site supports; return fewer tasks if needed rather than inventing any.
 
 - kind "answer": the agent must report a fact. Give "expected_answer" EXACTLY as it appears on the site (a price,
   a number, a name, a limit) and 2-4 "answer_aliases" with other spellings ("$3.95", "3.95/hr", "3.95 per hour").
@@ -37,7 +44,8 @@ would ask an assistant to do on this site. Every task must be automatically chec
   "expected_event" is the endpoint name after `api/` (e.g. "waitlist_submit" for `api/waitlist_submit`), and
   "expected_event_match" is a subset of the submitted field names -> values, using concrete values that you put in the
   prompt (use the email agent@example.com and the company "Example Corp" when a form needs them). Only use endpoints
-  and field names that appear in the site files.
+  and field names that appear in the site files. The site's postEvent("name", payload) helper also records named
+  events. If no recorded endpoints/events are found, do not write action tasks.
 
 Write prompts a human would write ("How much does an H100 cost per hour?", "Sign me up for the waitlist with
 agent@example.com"), do not mention HTML, selectors or hints. Mix easy and hard tasks. Also set "trap" to a short
@@ -54,6 +62,16 @@ def _pages(files: dict[str, str]) -> list[str]:
     return sorted(p for p in files if p.lower().endswith((".html", ".htm")))
 
 
+def _evidence_files(files: dict[str, str]) -> dict[str, str]:
+    # A task manifest cannot serve as evidence for its own answers or actions.
+    return {p: text for p, text in files.items() if Path(p).name != "abtract-tasks.json"}
+
+
+def task_site_files(site_dir: Path) -> dict[str, str]:
+    """Use the complete captured files for validation, even beyond the model's context limit."""
+    return _evidence_files(site_files(site_dir, cap=None))
+
+
 def _api_endpoints(files: dict[str, str]) -> dict[str, set[str]]:
     """endpoint name -> field names seen in the same file (best effort)."""
     out: dict[str, set[str]] = {}
@@ -63,6 +81,9 @@ def _api_endpoints(files: dict[str, str]) -> dict[str, set[str]]:
             name = m.group(1).split("api/", 1)[1].strip("/")
             if name:
                 out.setdefault(name, set()).update(names)
+        # Custom controls in the demo use the shared api/event recorder instead of a form action.
+        for name in _EVENT_RE.findall(text):
+            out.setdefault(name, set()).update(names)
     return out
 
 
@@ -73,6 +94,8 @@ def _page_exists(pattern: str, pages: list[str]) -> bool:
         return False
     for p in pages:
         cands = {p, "/" + p}
+        if p.endswith(".html"):
+            cands |= {p[:-5], "/" + p[:-5]}  # the site server also accepts extensionless paths
         if p.endswith("index.html"):
             d = p[: -len("index.html")]
             cands |= {d, d.rstrip("/"), "/" + d}
@@ -82,9 +105,14 @@ def _page_exists(pattern: str, pages: list[str]) -> bool:
 
 
 def validate_tasks(raw: list[dict[str, Any]], files: dict[str, str], *, n: int) -> list[Task]:
+    if n <= 0:
+        return []
+    files = _evidence_files(files)
     pages = _pages(files)
     endpoints = _api_endpoints(files)
-    corpus = "\n".join(files.values()).lower()
+    # Include rendered text for entities/inline markup, plus assets for JS/canvas/CSS facts.
+    texts = [*files.values(), *(BeautifulSoup(files[p], "html.parser").get_text(" ", strip=True) for p in pages)]
+    corpus = " ".join(unescape("\n".join(texts)).lower().split())
     tasks: list[Task] = []
     for i, t in enumerate(raw):
         try:
@@ -102,7 +130,9 @@ def validate_tasks(raw: list[dict[str, Any]], files: dict[str, str], *, n: int) 
         if task.kind == TaskKind.answer:
             if not task.expected_answer:
                 continue
-            if task.expected_answer.lower() not in corpus and not any(a.lower() in corpus for a in task.answer_aliases):
+            candidates = [" ".join(unescape(a).lower().split())
+                          for a in [task.expected_answer, *task.answer_aliases] if a.strip()]
+            if not any(a in corpus for a in candidates):
                 continue  # not a fact on the site
         elif task.kind == TaskKind.url:
             if not task.expected_url_pattern or not _page_exists(task.expected_url_pattern, pages):
@@ -111,7 +141,7 @@ def validate_tasks(raw: list[dict[str, Any]], files: dict[str, str], *, n: int) 
             if not task.expected_event:
                 continue
             task.expected_event = task.expected_event.split("api/", 1)[-1].strip("/")
-            if endpoints and task.expected_event not in endpoints:
+            if task.expected_event not in endpoints:
                 continue
         if any(x.id == task.id for x in tasks):
             task.id = f"{task.id}_{i}"
@@ -124,14 +154,14 @@ def validate_tasks(raw: list[dict[str, Any]], files: dict[str, str], *, n: int) 
 def generate_tasks(site_id: str, version: str, n: int = 8, *, model_id: str = GENERATOR_MODEL,
                    site_dir: Path | None = None) -> list[Task]:
     site_dir = site_dir or store.site_dir(site_id, version)
-    files = site_files(site_dir)
+    files = task_site_files(site_dir)
     if not files:
         raise FileNotFoundError(f"no site files under {site_dir}")
     endpoints = _api_endpoints(files)
     inventory = ["# Pages", *[f"- {p}" for p in _pages(files)], "", "# api endpoints found (name: field names)"]
     inventory += [f"- {k}: {sorted(v)}" for k, v in sorted(endpoints.items())] or ["- (none found)"]
     body = "\n\n".join(f"### FILE: {p}\n```\n{c}\n```" for p, c in files.items())
-    user = (f"Write {n} tasks ({max(1, n // 2)} answer, {max(1, n // 4)} url, {max(1, n - n // 2 - n // 4)} action) "
+    user = (f"Write up to {n} distinct tasks, choosing answer, url, and action tasks only where supported "
             f"for site {site_id}/{version}.\n\n" + "\n".join(inventory) + "\n\n# Site files\n" + body)
     if len(user) > 250_000:
         user = user[:250_000] + "\n... [truncated]"

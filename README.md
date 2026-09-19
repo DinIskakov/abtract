@@ -15,7 +15,7 @@ Quick scans choose checkable tasks from the site's task file or fetched HTML, wi
 
 Product jobs keep up to 16 attempts in flight, filling a slot whenever an attempt finishes. `ABTRACT_JOB_SWARM_CONCURRENCY` controls this internal limit (clamped to 1–40); the CLI defaults to eight. Short tasks start first, interleaved across models and agent kinds. A slow attempt no longer stalls an entire batch; the existing internal spending allowance still applies. Model-client retries do not multiply the runner's retry policy.
 
-The demo is a fake GPU-cloud website with 10 deliberate agent traps and 14 tasks. See [demo_site/TRAPS.md](demo_site/TRAPS.md). A site can supply an `abtract-tasks.json` manifest; otherwise Gemini generates tasks, with a generic navigation fallback when no key is configured.
+The demo is a fake GPU-cloud website with 10 deliberate agent traps and 14 tasks. See [demo_site/TRAPS.md](demo_site/TRAPS.md). Tasks come from a site's `abtract-tasks.json` manifest, then Gemini generation when configured, then a deterministic fallback using the captured homepage headline and links to captured pages. Supplied and generated tasks are checked against the site: navigation targets must exist, answers must appear in the captured content/assets, and actions must have a recorded endpoint/event. Missing pricing, docs, or signup pages do not produce tasks. Quick scans apply the same manifest checks and otherwise use homepage content and links. Crawl omissions reduce task coverage; a broken or uncaptured link is not an agent task. Optimization keeps the baseline tasks fixed for comparison.
 
 | Agent | What it sees |
 | --- | --- |
@@ -90,6 +90,8 @@ The product and demo use the same Modal deployment, with two separate HTTPS endp
 The product is protected for a shared team trial; the demo and mirrored snapshots are publicly accessible on the separate site endpoint. This is not a multi-tenant customer service yet. Use public test content, and run one optimization loop per site at a time: version metadata uses a filesystem store without distributed locking.
 
 ### Execution and cost controls
+
+Product jobs run up to **40 attempts concurrently**, configured by `ABTRACT_JOB_SWARM_CONCURRENCY` (bounded to 1–40). The Modal episode function also allows up to 40 containers across jobs. Cloning and task selection still finish before the swarm starts; new settings apply to newly started jobs.
 
 Snapshots are static folders on the Volume, served by one small container that can scale to zero. Each agent episode runs in a Modal function container. Gemini output is checked in a sandbox before its version is registered. A separate always-running sandbox per clone is unnecessary for this static-site prototype. Authenticated apps and sites that need a live backend require a different deployment strategy; mirrored form submissions record simulated events rather than running the original backend.
 

@@ -13,7 +13,7 @@ success / steps / time / cost -> Gemini rewrites the site to remove what tripped
 - `abtract/swarm/`         `runner.py` (Modal fn `run_episode`, `run_swarm` fan-out local/cloud), `cli.py` (shared arg parsing for scripts), `report.py` (rich tables).
 - `abtract/metrics/`       `score.py`: `judge()` (answer/url/action), `aggregate()`, `compare()`.
 - `abtract/optimizer/`     `rewrite.py` (Gemini context -> proposal -> new version, validated by `check_site.py` in a modal.Sandbox or subprocess; Modal fn `optimize_site_remote`), `task_gen.py` (Gemini writes tasks), `findings.py` (plain-language report for the job page). `ABTRACT_OPTIMIZER_MODEL=mock` for offline.
-- `abtract/intake/`        `mirror.py` (crawl a URL into the store as `<site_id>/v0`, links rewritten relative), `tasks.py` (`pick_tasks`: site-provided `abtract-tasks.json` -> Gemini -> generic).
+- `abtract/intake/`        `mirror.py` (crawl a URL into the store as `<site_id>/v0`, links rewritten relative), `tasks.py` (`pick_tasks`: validated site-provided `abtract-tasks.json` -> Gemini -> tasks derived from captured content/links).
 - `abtract/jobs.py`        `start_job(Job)` / `run_job_sync`: the product flow (intake: mirror -> tasks -> swarm -> findings; loop: optimize -> swarm x N). Modal fn `run_job`.
 - `abtract/hosting/`       `urls.py` (`resolve_site_base_url()` via env or the deployed `site_server` web URL), `serve.py`: serves versions at `/s/{site_id}/{version}/`, records SiteEvents from `POST .../api/event` and `.../api/{name}`. Modal fn `site_server` (label `site`).
 - `abtract/dashboard/`     `app.py` FastAPI + `static/` (bundled into `static_bundle.py` for Modal, regenerated on import). Modal fn `dashboard` (label `dashboard`).
