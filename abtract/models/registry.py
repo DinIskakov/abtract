@@ -124,14 +124,14 @@ def select_models(spec: str) -> list[ModelSpec]:
     return chosen
 
 
-def discover_modal_models() -> list[str]:
+def discover_modal_models(base_url: str | None = None) -> list[str]:
     """Ask the Modal inference gateway which model names this proxy token can call."""
     import httpx
 
     if not settings.modal_proxy_token:
         raise RuntimeError("MODAL_PROXY_TOKEN is not set")
     r = httpx.get(
-        f"{settings.modal_inference_base_url}/models",
+        f"{(base_url or settings.modal_inference_base_url).rstrip('/')}/models",
         headers={"Authorization": f"Bearer {settings.modal_proxy_token}"},
         timeout=30,
     )

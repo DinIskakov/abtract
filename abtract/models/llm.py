@@ -87,9 +87,16 @@ def _has_image(m: ChatMessage) -> bool:
 # listing is unavailable or nothing matches, the configured name is sent unchanged.
 
 _MIN_SUBSTRING_LEN = 4                              # "k3" alone must not match anything
-_MODAL_MODEL_NAMES: list[str] | None = None         # gateway listing; None = not fetched yet, [] = fetch failed
-_MODAL_RESOLVED: dict[str, str] = {}                # spec.model -> name to send
+_MODAL_MODEL_NAMES: dict[str, list[str]] = {}        # endpoint URL -> listing; [] = fetch failed
+_MODAL_RESOLVED: dict[tuple[str, str], str] = {}     # (endpoint URL, spec.model) -> name to send
 _resolve_lock = threading.Lock()
+
+
+def modal_base_url(spec: ModelSpec) -> str:
+    """Per-model API base URL, including /v1, or the shared gateway fallback."""
+    suffix = re.sub(r"[^A-Za-z0-9]+", "_", spec.id).upper()
+    override = os.environ.get(f"ABTRACT_BASE_URL_{suffix}", "").strip()
+    return (override or settings.modal_inference_base_url).rstrip("/")
 
 
 def _norm(s: str) -> str:
@@ -131,31 +138,32 @@ def match_model_name(wanted: str, available: list[str]) -> str | None:
     return min(hits, key=len) if hits else None  # several hits: the shortest listed name is the closest
 
 
-def _modal_model_names() -> list[str]:
-    global _MODAL_MODEL_NAMES
+def _modal_model_names(base_url: str) -> list[str]:
     with _resolve_lock:
-        if _MODAL_MODEL_NAMES is None:
+        if base_url not in _MODAL_MODEL_NAMES:
             from abtract.models import registry  # looked up at call time so tests can monkeypatch discover_modal_models
 
             try:
-                _MODAL_MODEL_NAMES = list(registry.discover_modal_models())
+                _MODAL_MODEL_NAMES[base_url] = list(registry.discover_modal_models(base_url=base_url))
             except Exception as e:  # noqa: BLE001  no token, network down, gateway 5xx: send configured names as-is
                 log.warning("could not list Modal models (%s: %s); using configured model names unchanged",
                             type(e).__name__, e)
-                _MODAL_MODEL_NAMES = []
-        return _MODAL_MODEL_NAMES
+                _MODAL_MODEL_NAMES[base_url] = []
+        return _MODAL_MODEL_NAMES[base_url]
 
 
 def resolve_modal_model(spec: ModelSpec) -> str:
     """The `model` string to send to the Modal gateway for `spec`. Resolved once per process; never raises."""
     if spec.provider != "modal":
         return spec.model
-    if spec.model in _MODAL_RESOLVED:
-        return _MODAL_RESOLVED[spec.model]
-    names = _modal_model_names()
+    base_url = modal_base_url(spec)
+    key = (base_url, spec.model)
+    if key in _MODAL_RESOLVED:
+        return _MODAL_RESOLVED[key]
+    names = _modal_model_names(base_url)
     resolved = match_model_name(spec.model, names) or spec.model
     with _resolve_lock:
-        _MODAL_RESOLVED[spec.model] = resolved
+        _MODAL_RESOLVED[key] = resolved
     if resolved != spec.model:
         log.info("modal model %s: '%s' -> '%s' (matched in /v1/models)", spec.id, spec.model, resolved)
     elif names and spec.model not in names:
@@ -169,9 +177,8 @@ def resolve_modal_model(spec: ModelSpec) -> str:
 
 def reset_modal_model_cache() -> None:
     """Forget the gateway listing and every resolved name (tests, or after `modal endpoint create`)."""
-    global _MODAL_MODEL_NAMES
     with _resolve_lock:
-        _MODAL_MODEL_NAMES = None
+        _MODAL_MODEL_NAMES.clear()
         _MODAL_RESOLVED.clear()
 
 
@@ -182,7 +189,7 @@ def _chat_openai_compatible(spec, messages, json_mode, max_out, temperature) -> 
 
     if not settings.modal_proxy_token:
         raise LLMError("MODAL_PROXY_TOKEN is not set (see .env.example)")
-    client = OpenAI(api_key=settings.modal_proxy_token, base_url=settings.modal_inference_base_url, timeout=120)
+    client = OpenAI(api_key=settings.modal_proxy_token, base_url=modal_base_url(spec), timeout=120)
     oa_messages = []
     for m in messages:
         if isinstance(m.content, str):

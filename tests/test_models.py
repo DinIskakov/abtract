@@ -120,7 +120,7 @@ def _spec(model: str, provider: str = "modal") -> ModelSpec:
 
 
 def _listing(monkeypatch, names, calls=None):
-    def discover():
+    def discover(base_url=None):
         if calls is not None:
             calls.append(1)
         if isinstance(names, Exception):
@@ -199,6 +199,71 @@ def test_chat_sends_the_resolved_name(monkeypatch, fresh_resolution):
     assert captured["model"] == "kimi-k3.us-west.modal.direct"
     assert captured["client_kwargs"]["api_key"] == "wk-x.ws-y"
     assert r.text == "hi" and r.usage.input_tokens == 7 and r.usage.llm_calls == 1
+
+
+def test_per_model_endpoint_url_falls_back_to_gateway(monkeypatch):
+    monkeypatch.setattr(settings, "modal_inference_base_url", "https://gateway.example/v1/")
+    monkeypatch.setenv("ABTRACT_BASE_URL_DEEPSEEK_V4_1_FLASH", " https://deepseek.example/v1/ ")
+    monkeypatch.setenv("ABTRACT_BASE_URL_GLM_5_3_FLASH", " ")
+    assert llm.modal_base_url(get_model("deepseek-v4.1-flash")) == "https://deepseek.example/v1"
+    assert llm.modal_base_url(get_model("glm-5.3-flash")) == "https://gateway.example/v1"
+
+
+def test_discovery_uses_requested_endpoint(monkeypatch):
+    captured = {}
+
+    def fake_get(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"data": [{"id": "served-model"}]})
+
+    monkeypatch.setattr("httpx.get", fake_get)
+    monkeypatch.setattr(settings, "modal_proxy_token", "test-proxy-token")
+    assert registry.discover_modal_models("https://endpoint.example/v1/") == ["served-model"]
+    assert captured["url"] == "https://endpoint.example/v1/models"
+    assert captured["headers"]["Authorization"] == "Bearer test-proxy-token"
+
+
+def test_resolution_cache_is_separate_for_each_endpoint(monkeypatch, fresh_resolution):
+    calls = []
+
+    def discover(base_url=None):
+        calls.append(base_url)
+        return ["model-first"] if base_url == "https://first.example/v1" else ["model-second"]
+
+    monkeypatch.setattr(registry, "discover_modal_models", discover)
+    monkeypatch.setenv("ABTRACT_BASE_URL_FIRST", "https://first.example/v1")
+    monkeypatch.setenv("ABTRACT_BASE_URL_SECOND", "https://second.example/v1")
+    first = ModelSpec(id="first", provider="modal", model="vendor/model", display_name="First")
+    second = first.model_copy(update={"id": "second"})
+    for _ in range(2):
+        assert resolve_modal_model(first) == "model-first"
+        assert resolve_modal_model(second) == "model-second"
+    assert calls == ["https://first.example/v1", "https://second.example/v1"]
+
+
+@pytest.mark.parametrize("model_id,suffix", [
+    ("deepseek-v4.1-flash", "DEEPSEEK_V4_1_FLASH"), ("glm-5.3-flash", "GLM_5_3_FLASH"),
+])
+def test_chat_uses_its_models_endpoint(monkeypatch, fresh_resolution, model_id, suffix):
+    captured = {}
+    spec = get_model(model_id)
+    base = f"https://{model_id}.example/v1"
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.complete))
+
+        def complete(self, **kwargs):
+            captured["model"] = kwargs["model"]
+            return SimpleNamespace(id="test", model=kwargs["model"], choices=[], usage=None)
+
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
+    monkeypatch.setattr(settings, "modal_proxy_token", "test-token")
+    monkeypatch.setenv(f"ABTRACT_BASE_URL_{suffix}", base)
+    _listing(monkeypatch, [spec.model])
+    llm.chat(spec, [ChatMessage(role="user", content="test")], retries=1)
+    assert captured["base_url"] == base and captured["model"] == spec.model
 
 
 # --------------------------------------------------------------------------- estimate_run_cost
