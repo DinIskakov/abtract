@@ -1,134 +1,70 @@
-# Abtract Monorepo
+# abtract — A/B testing for AI agents
 
-A production-ready fullstack monorepo featuring a **Next.js** frontend and a **FastAPI** backend, orchestrated using **Turborepo**, **Bun**, **uv**, and **mise**.
+abtract measures how well AI agents can use a website, uses Gemini to propose a revised snapshot, and tests it again.
 
----
+The repository has two application stacks:
 
-## 🏛 Architecture & Stack
+- `apps/web`: Next.js product UI on port 3000.
+- `apps/api`: FastAPI product API, hosted-site routes, agent runtime, and Modal definitions on port 8000.
 
-- **Tooling & Environment Management:** [mise](https://mise.jdx.dev/) pins tools (`node`, `bun`, `uv`, `python 3.12`) and provides unified CLI tasks.
-- **Monorepo Orchestration:** [Turborepo](https://turbo.build/repo) coordinates parallel execution, dependency graph ordering, and caching across JavaScript and Python workspaces.
-- **Frontend App (`apps/web`):** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, and Bun Test.
-- **Backend App (`apps/api`):** FastAPI, Pydantic v2, Uvicorn, Ruff (linting & formatting), Mypy (type checking), and Pytest, fully managed with [uv](https://docs.astral.sh/uv/).
-- **Shared Packages (`packages/*`):** `@abtract/typescript-config` for centralized compiler options across apps.
+Shared TypeScript configuration remains in `packages/`. Python code, tests, scripts, fixtures, dependency metadata, and the Modal entrypoint all belong to `apps/api`.
 
----
+## Local development
 
-## 📁 Repository Structure
-
-```text
-.
-├── apps/
-│   ├── web/                     # Next.js frontend application
-│   │   ├── src/app/             # App Router pages and layouts
-│   │   ├── next.config.ts       # Configured with API proxy rewrites to FastAPI
-│   │   └── package.json
-│   └── api/                     # FastAPI backend application
-│       ├── app/
-│       │   ├── main.py          # App entrypoint and CORS configuration
-│       │   ├── config.py        # Pydantic Settings
-│       │   └── routers/         # Modular route definitions
-│       ├── tests/               # Pytest suite
-│       ├── pyproject.toml       # Python dependencies, Ruff, pytest, and mypy config
-│       ├── uv.lock              # Deterministic uv lockfile
-│       └── package.json         # Workspace adapter for Turborepo
-├── packages/
-│   └── typescript-config/       # Shared TypeScript configuration
-├── mise.toml                    # Mise tool versions and task definitions
-├── turbo.json                   # Turborepo task pipeline configuration
-├── package.json                 # Root workspace manifest
-└── bun.lock                     # Root Bun lockfile
-```
-
----
-
-## 🚀 Getting Started
-
-### 1. Prerequisites
-
-Ensure [mise](https://mise.jdx.dev/) is installed on your system:
+Install mise, then prepare the full workspace once:
 
 ```bash
-# macOS / Linux
-curl https://mise.run | sh
+mise run setup
 ```
 
-### 2. Install Tools & Dependencies
-
-With mise installed, activate the environment and install all dependencies:
-
-```bash
-# Install toolchains (Node, Bun, uv, Python 3.12)
-mise install
-
-# Install all workspace dependencies (Bun packages and uv virtualenv)
-mise run install
-```
-
----
-
-## 🛠 Everyday Development
-
-### Run Development Servers
-
-To run both Next.js (port `3000`) and FastAPI (port `8000`) concurrently with hot-reloading:
+Start both applications with hot reload:
 
 ```bash
 mise run dev
 ```
 
-Or run individual apps:
+Open [http://localhost:3000](http://localhost:3000). Next.js proxies `/api/*` and `/screenshots/*` to FastAPI. FastAPI also serves imported test sites at `/s/{site}/{version}/`, so no second Python server is required. The demo is available at [http://localhost:8000/s/demo/v0/](http://localhost:8000/s/demo/v0/).
+
+Useful focused commands:
 
 ```bash
-# Run only Next.js frontend
 mise run dev:web
-
-# Run only FastAPI backend
 mise run dev:api
+mise run demo:import
+mise run lint
+mise run typecheck
+mise run test
+mise run build
 ```
 
-### Access Endpoints
+Copy `.env.example` to `.env` or `apps/api/.env` when local credentials are needed. Keep `ABTRACT_OPTIMIZER_MODEL=mock` and select the mock model for an offline workflow check.
 
-- **Web App:** [http://localhost:3000](http://localhost:3000)
-- **FastAPI Direct:** [http://localhost:8000](http://localhost:8000)
-- **Interactive Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs) (or [http://localhost:3000/docs](http://localhost:3000/docs) via Next.js proxy)
-- **API Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+## Repository map
 
----
+| Responsibility | Location |
+| --- | --- |
+| Landing, job progress, and dashboard UI | `apps/web/src/app`, `apps/web/src/components` |
+| Browser behavior and product styles | `apps/web/public/scripts`, `apps/web/src/styles` |
+| FastAPI entrypoint and product routes | `apps/api/app/main.py`, `apps/api/app/routers/product.py` |
+| Agent execution and scheduling | `apps/api/app/agents`, `apps/api/app/swarm` |
+| Intake, findings, and rewrites | `apps/api/app/intake`, `apps/api/app/optimizer` |
+| Storage contracts and job orchestration | `apps/api/app/schemas.py`, `apps/api/app/store.py`, `apps/api/app/jobs.py` |
+| Hosted test sites | `apps/api/app/hosting` |
+| Modal app and deployment entrypoint | `apps/api/app/modal_app.py`, `apps/api/deploy.py` |
+| Demo fixture and Python utilities | `apps/api/demo_site`, `apps/api/scripts` |
+| Backend tests | `apps/api/tests` |
 
-## 🧪 Testing, Linting & Building
+## Modal
 
-Mise tasks delegate directly to Turborepo, running tasks in parallel with smart caching:
-
-| Action | Mise Command | Underlying Command |
-|---|---|---|
-| **Install Dependencies** | `mise run install` | `bun install && (cd apps/api && uv sync)` |
-| **Run All Tests** | `mise run test` | `turbo test` (`bun test` + `pytest`) |
-| **Lint Everything** | `mise run lint` | `turbo lint` (`eslint` + `ruff check`) |
-| **Fix Lint Issues** | `mise run lint:fix` | `turbo lint:fix` (`eslint --fix` + `ruff check --fix & ruff format`) |
-| **Typecheck Everything** | `mise run typecheck` | `turbo typecheck` (`tsc` + `mypy`) |
-| **Production Build** | `mise run build` | `turbo build` (`next build` + `uv sync`) |
-
----
-
-## 📦 Adding Dependencies
-
-### Adding Frontend Packages (Bun)
-
-```bash
-# To apps/web
-bun add <package-name> --cwd apps/web
-
-# Development dependency
-bun add -d <package-name> --cwd apps/web
-```
-
-### Adding Backend Packages (uv)
+Create or update the `abtract-secrets` secret from `.env.modal`, then use the workspace tasks:
 
 ```bash
 cd apps/api
-uv add <package-name>
-
-# Development dependency
-uv add --dev <package-name>
+uv run modal secret create abtract-secrets --from-dotenv ../../.env.modal
+cd ../..
+mise run modal:deploy
 ```
+
+`mise run modal:serve` provides hot reload. `mise run modal:deploy` deploys the API, site host, swarm workers, and optimizer from the single app-owned entrypoint.
+
+See [endpoint setup](docs/endpoint-setup.md) for inference endpoint details.

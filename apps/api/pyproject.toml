@@ -5,33 +5,60 @@ description = "FastAPI backend service for Abtract"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "modal==1.5.5",
-    "fastapi>=0.115.0",
-    "pydantic>=2.10.0",
-    "pydantic-settings>=2.7.0",
-    "uvicorn[standard]>=0.34.0",
+  "beautifulsoup4>=4.12",
+  "fastapi>=0.115.0",
+  "google-genai>=1.20",
+  "httpx>=0.27",
+  "lxml>=5.0",
+  "markdownify>=0.13",
+  "modal>=1.0",
+  "openai>=1.50",
+  "playwright>=1.47",
+  "pydantic>=2.10.0",
+  "pydantic-settings>=2.7.0",
+  "python-dotenv>=1.0",
+  "python-multipart>=0.0.20",
+  "rich>=13.0",
+  "uvicorn[standard]>=0.34.0",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.0",
-    "mypy>=1.14.0",
-    "pytest>=8.0.0",
-    "ruff>=0.9.0",
+  "httpx>=0.28.0",
+  "mypy>=1.14.0",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.9.0",
 ]
-
-[tool.ruff]
-line-length = 88
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+  "app.agents.*",
+  "app.hosting.*",
+  "app.intake.*",
+  "app.metrics.*",
+  "app.models.*",
+  "app.optimizer.*",
+  "app.swarm.*",
+  "app.jobs",
+  "app.modal_app",
+  "app.store",
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B023", "B905", "E501", "SIM105", "UP042"]

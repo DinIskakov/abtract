@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volumes · Zephyr Compute</title>
+<meta name="description" content="Persist model weights and datasets on a network file system shared by all your containers.">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body data-root="../../" data-page="docs">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="../../index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+<div class="container docs-layout">
+<aside class="docs-sidebar">
+  <h5>Getting started</h5>
+  <ul>
+    <li><a href="../index.html">Overview &amp; guides</a></li>
+    <li><a href="../quickstart.html">Quickstart</a></li>
+  </ul>
+  <h5>Reference</h5>
+  <ul>
+    <li><a href="../limits.html">Limits &amp; quotas</a></li>
+    <li><a href="../python-versions.html">Python versions</a></li>
+    <li><a href="../regions.html">Regions</a></li>
+  </ul>
+</aside>
+<article class="docs-content">
+
+<h1>Volumes</h1>
+<p class="lede">Persist model weights and datasets on a network file system shared by all your containers.</p>
+
+<p>Volumes are durable, replicated file systems that you mount into containers at a path of your choice. They are the right place for model weights, tokenizers, datasets and checkpoints.</p>
+<pre class="code"><code>weights = zephyr.Volume.from_name(<span class="st">"model-cache"</span>, create_if_missing=True)
+
+<span class="dec">@app.function</span>(gpu=<span class="st">"A100"</span>, volumes={<span class="st">"/cache"</span>: weights})
+<span class="kw">def</span> <span class="fn">load</span>():
+    <span class="kw">return</span> torch.load(<span class="st">"/cache/model.pt"</span>)</code></pre>
+<p>Writes become visible to other containers after <code>weights.commit()</code>. Use <code>zephyr volume put</code> and <code>zephyr volume get</code> to move files from your laptop.</p>
+<h2>Snapshots</h2>
+<p>Take a point-in-time snapshot with <code>zephyr volume snapshot model-cache</code> and restore it with <code>zephyr volume restore</code>.</p>
+
+<div class="docs-footer-nav"><a href="../index.html">&larr; All guides</a><a href="../quickstart.html">Quickstart &rarr;</a></div>
+
+</article>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="../../pricing.html">Pricing</a></li>
+        <li><a href="../../docs/index.html">Documentation</a></li>
+        <li><a href="../../newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="../../about.html">About</a></li>
+        <li><a href="../../contact.html">Contact</a></li>
+        <li><a href="../../waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

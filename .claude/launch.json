@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "uvicorn", "app.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "port": 8000
+    },
+    {
+      "name": "web",
+      "runtimeArgs": ["dev"],
+      "runtimeExecutable": "bun",
+      "cwd": "${workspaceFolder}/apps/web",
+      "port": 3000
+    }
+  ]
+}

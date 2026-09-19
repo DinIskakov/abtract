@@ -1,0 +1,271 @@
+// Product markup migrated from the former backend-served templates.
+
+export const landingMarkup = `
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="abtract home"><span class="brand-mark" aria-hidden="true">⌁</span> abtract</a>
+  <nav class="nav" aria-label="Main navigation">
+    <a href="#how">The idea</a>
+    <a href="#examples">Examples</a>
+    <a href="/dashboard">Dashboard <span aria-hidden="true">↗</span></a>
+  </nav>
+</header>
+
+<main id="main" class="landing">
+  <section class="hero-wrap" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">A/B testing for AI agents</p>
+      <h1 id="hero-title">Evolve the<br>environment.</h1>
+      <p class="lede">Put your website in the hands of a swarm.<br>Measure what happens. Make it better.</p>
+      <a class="text-link" href="#start">Run your first experiment <span aria-hidden="true">↗</span></a>
+    </div>
+    <figure class="environment-figure">
+      <svg viewBox="0 0 520 360" role="img" aria-labelledby="loop-title loop-desc">
+        <title id="loop-title">The environment evolves around the agents</title>
+        <desc id="loop-desc">A swarm of agents explores a website. Outcomes are measured and fed back into a new version of the environment.</desc>
+        <defs>
+          <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="currentColor" opacity=".2"/></pattern>
+          <marker id="arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 6 4 1 7" fill="none" stroke="currentColor"/></marker>
+        </defs>
+        <rect width="520" height="360" fill="url(#dots)"/>
+        <g class="diagram-orbits" fill="none" stroke="currentColor" stroke-width="1">
+          <ellipse cx="266" cy="176" rx="203" ry="128" stroke-dasharray="3 6" opacity=".28"/>
+          <path d="M76 112C145 112 118 158 189 158M65 214C131 214 118 183 189 183M122 276C161 276 149 209 189 209" opacity=".5"/>
+          <path d="M340 180H421V280H269" marker-end="url(#arrow)"/>
+          <path d="M225 280H151V76H256V112" marker-end="url(#arrow)" opacity=".5"/>
+        </g>
+        <g class="diagram-agents" fill="var(--page)" stroke="currentColor" stroke-width="1.5">
+          <circle cx="76" cy="112" r="6"/><circle cx="65" cy="214" r="6"/><circle cx="122" cy="276" r="6"/>
+          <circle cx="359" cy="61" r="4"/><circle cx="465" cy="228" r="4"/>
+        </g>
+        <g class="diagram-environment">
+          <rect x="189" y="121" width="150" height="115" rx="2" fill="var(--page)" stroke="currentColor"/>
+          <path d="M189 147H339" stroke="currentColor"/>
+          <g fill="currentColor"><circle cx="201" cy="134" r="2"/><circle cx="210" cy="134" r="2"/><circle cx="219" cy="134" r="2"/></g>
+          <path d="M207 165H263M207 175H246M207 185H257" stroke="currentColor" opacity=".5"/>
+          <rect x="207" y="203" width="52" height="16" rx="1" fill="var(--blue-soft)"/>
+          <path d="M215 211H249" stroke="currentColor"/>
+          <path d="M280 166H321V219H280Z" fill="var(--blue-soft)"/>
+          <path d="m290 191 7 7 14-18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </g>
+        <circle class="diagram-signal" cx="421" cy="180" r="5" fill="currentColor"/>
+        <g fill="currentColor" font-size="14" font-family="Arial, Helvetica, sans-serif">
+          <text x="43" y="87">Agents</text>
+          <text x="220" y="105">Environment</text>
+          <text x="378" y="159">Reward</text>
+          <rect x="210" y="266" width="75" height="25" fill="var(--page)"/>
+          <text x="217" y="285">Evolve</text>
+        </g>
+      </svg>
+      <figcaption>Explore. Evaluate. Evolve. Repeat.</figcaption>
+    </figure>
+  </section>
+
+  <section id="start" class="experiment" aria-labelledby="experiment-title">
+    <div class="experiment-heading"><h2 id="experiment-title">Start with your website.</h2><span class="sub">One URL. A swarm of perspectives.</span></div>
+    <form id="intake" class="url-form" autocomplete="off" novalidate>
+      <input id="url" name="url" class="url" type="text" inputmode="url" placeholder="https://your-site.com" spellcheck="false" aria-label="Website URL" aria-describedby="form-status">
+      <button type="submit" id="go" class="btn primary lg">Run full audit ↗</button>
+    </form>
+    <div class="hero-actions">
+      <button type="button" id="demo" class="text-link">Try with the demo site <span aria-hidden="true">↗</span></button>
+      <span id="form-status" class="form-status" role="status"></span>
+    </div>
+    <details class="options" id="options">
+      <summary>Configure swarm <span class="sub" id="options-sub"></span></summary>
+      <div class="scan-choice">
+        <label for="scan-mode">Coverage</label>
+        <select id="scan-mode"><option value="full" selected>Full audit</option><option value="quick">Quick scan</option></select>
+        <span class="sub" id="scan-description">Parallel agents. Results as they finish.</span>
+      </div>
+      <div class="options-grid">
+        <div class="opt"><h3>Models</h3><div id="models" class="checks"><span class="muted">Loading…</span></div></div>
+        <div class="opt"><h3>Agents</h3><div id="agents" class="checks"></div></div>
+      </div>
+    </details>
+  </section>
+
+  <section id="how" class="section idea-section" aria-labelledby="idea-title">
+    <div class="section-intro"><span class="eyebrow">The idea</span><h2 id="idea-title">An RL-inspired loop.<br>The environment is what evolves.</h2></div>
+    <div class="how-grid">
+      <div class="how-step"><span class="num">01 / Environment</span><p>Your website or tool.<br>The space agents act in.</p></div>
+      <div class="how-step"><span class="num">02 / Agents</span><p>A swarm that attempts tasks.<br>Different models. Different perspectives.</p></div>
+      <div class="how-step"><span class="num">03 / Reward</span><p>Your objective, measured.<br>Maximize, minimize, or balance.</p></div>
+    </div>
+    <p class="loop-note"><span aria-hidden="true">↳</span> Revise the site. Run the same tasks. Measure the change.</p>
+  </section>
+
+  <section id="examples" class="section" aria-labelledby="examples-title">
+    <div class="section-head"><h2 id="examples-title">Success is yours to define.</h2><span class="sub">Illustrative tasks</span></div>
+    <div class="example-row"><span class="example-kind">Enable</span><div><h3>“Launch a Modal instance.”</h3><p>Make the intended path easy to complete.</p></div><span class="example-goal"><span aria-hidden="true">↗</span> Maximize completion</span></div>
+    <div class="example-row"><span class="example-kind">Protect</span><div><h3>“Access a restricted resource.”</h3><p>Some tasks should never succeed.</p></div><span class="example-goal"><span aria-hidden="true">↘</span> Minimize unauthorized access</span></div>
+  </section>
+
+  <section id="recent" class="section">
+    <div class="section-head"><h2>Recent experiments</h2><a href="/dashboard" class="text-link">View dashboard ↗</a></div>
+    <div id="jobs" class="jobs-list"><span class="muted">Loading…</span></div>
+  </section>
+</main>
+<footer class="foot"><a class="brand" href="/">abtract</a><span>Better environments for agents.</span><a href="/api/docs">API ↗</a></footer>
+`;
+
+export const dashboardMarkup = `
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="abtract home"><span class="brand-mark" aria-hidden="true">⌁</span> abtract</a>
+  <div class="controls">
+    <label>Site <select id="site-select"></select></label>
+    <label class="check"><input type="checkbox" id="live"> Auto-refresh</label>
+    <button id="refresh" class="btn">Refresh</button>
+    <a href="/#start" class="btn primary">New experiment ↗</a>
+  </div>
+</header>
+
+<main id="main">
+  <div class="workspace-head"><h1>Swarm overview</h1><span id="status" class="status" role="status"></span></div>
+  <nav class="workspace-nav" aria-label="Dashboard sections">
+    <a href="#sec-timeline">Overview</a><a href="#sec-compare">Compare</a><a href="#sec-run">Agents</a><a href="#sec-versions">Versions</a>
+  </nav>
+  <section id="empty-state" class="empty-state hidden">
+    <h2>Your first experiment starts here.</h2>
+    <p>Give a swarm a website. See where it succeeds and where it gets stuck.</p>
+    <a class="btn primary" href="/#start">Start an experiment ↗</a>
+  </section>
+  <section class="card" id="sec-timeline">
+    <div class="card-head">
+      <h2>Version timeline</h2>
+      <span class="sub" id="timeline-sub">latest run per site version</span>
+    </div>
+    <div class="charts3">
+      <div class="chart-box">
+        <div class="hero" id="hero-success"></div>
+        <h3>Success rate</h3>
+        <div class="chart-wrap"><canvas id="chart-success" role="img" aria-label="Success rate by version"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="hero" id="hero-cost"></div>
+        <h3>Cost / attempt</h3>
+        <div class="chart-wrap"><canvas id="chart-cost" role="img" aria-label="Average cost by version"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="hero" id="hero-time"></div>
+        <h3>Time / attempt</h3>
+        <div class="chart-wrap"><canvas id="chart-time" role="img" aria-label="Average duration by version"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="sec-compare">
+    <div class="card-head">
+      <h2>Compare versions</h2>
+      <div class="picker">
+        <label>A <select id="run-a"></select></label>
+        <span class="vs">vs</span>
+        <label>B <select id="run-b"></select></label>
+      </div>
+    </div>
+    <div class="stat-row" id="compare-cards"></div>
+    <details class="comparison-detail"><summary>Task comparison</summary><div class="table-wrap"><table class="tbl" id="compare-tasks"></table></div></details>
+  </section>
+
+  <section class="card" id="sec-run">
+    <div class="card-head">
+      <h2>Agent outcomes</h2>
+      <div class="picker">
+        <label>Run <select id="run-select"></select></label>
+        <span id="run-meta" class="sub"></span>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="sw ok"></i> success</span>
+      <span><i class="sw fail"></i> failed</span>
+      <span><i class="sw pending"></i> not judged</span>
+      <span><i class="sw none"></i> no episode</span>
+      <span class="legend-note"><b>T</b>ext · <b>D</b>OM · <b>V</b>ision · Select an agent to view its trace</span>
+    </div>
+    <div class="table-wrap"><table class="heatmap" id="heatmap"></table></div>
+  </section>
+
+  <section class="card" id="sec-breakdown">
+    <div class="card-head"><h2>Breakdown</h2><span class="sub" id="breakdown-sub"></span></div>
+    <div class="breakdown3">
+      <div><h3>Models</h3><table class="tbl" id="tbl-model"></table></div>
+      <div><h3>Agents</h3><table class="tbl" id="tbl-agent"></table></div>
+      <div><h3>Failure patterns</h3><table class="tbl" id="tbl-trap"></table></div>
+    </div>
+  </section>
+
+  <section class="card" id="sec-versions">
+    <div class="card-head"><h2>Version notes</h2><span class="sub">what the optimizer changed and why</span></div>
+    <div id="versions" class="versions"></div>
+    <div id="file-viewer" class="file-viewer hidden"></div>
+  </section>
+</main>
+
+<div id="drawer-backdrop" class="backdrop hidden"></div>
+<aside id="drawer" class="drawer hidden" role="dialog" aria-modal="true" aria-label="Episode trace" tabindex="-1">
+  <div class="drawer-head">
+    <div id="drawer-title" class="drawer-title"></div>
+    <button id="drawer-close" class="btn">Close</button>
+  </div>
+  <div id="drawer-body" class="drawer-body"></div>
+</aside>
+
+<footer><span>abtract / experiments</span><a href="/api/docs">API ↗</a></footer>
+`;
+
+export const jobMarkup = `
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="abtract home"><span class="brand-mark" aria-hidden="true">⌁</span> abtract</a>
+  <nav class="nav" aria-label="Main navigation">
+    <a href="/">New run</a>
+    <a id="nav-dashboard" href="/dashboard" class="btn">Dashboard</a>
+  </nav>
+</header>
+
+<main id="main" class="jobpage">
+  <div class="job-head">
+    <div class="crumbs"><a href="/">abtract</a> / jobs / <span id="crumb-id" class="mono"></span></div>
+    <div class="job-title">
+      <span id="target" class="target">loading…</span>
+      <span id="type" class="chip hidden"></span>
+      <span id="status" class="pill queued">loading</span>
+    </div>
+    <div id="meta" class="job-meta"></div>
+  </div>
+
+  <div id="notfound" class="notfound hidden">
+    <h2>Job not found</h2>
+    <p>There is no job with this id in the store.</p>
+    <p><a class="btn primary" href="/">Start a new run</a></p>
+  </div>
+
+  <div id="body" class="stack">
+    <section class="card" id="progress-card">
+      <div id="stepper" class="stepper"></div>
+      <div class="phase-row" style="margin-top:16px">
+        <div id="phase" class="phase-now"></div>
+        <div id="progress-text" class="progress-text"></div>
+      </div>
+      <div id="progress" class="progress" style="margin-top:8px"><i style="width:0%"></i></div>
+      <div id="runs-so-far" class="runs-so-far hidden" style="margin-top:14px"></div>
+      <div id="error" class="errbox hidden" style="margin-top:14px"></div>
+      <details id="log-wrap" style="margin-top:14px">
+        <summary class="sub" style="cursor:pointer">Log</summary>
+        <pre id="log" class="log" style="margin-top:8px"></pre>
+      </details>
+    </section>
+
+    <section id="live-preview" class="card live-preview" aria-label="Initial findings"></section>
+    <div id="report" class="stack hidden"></div>
+
+    <section class="card" id="cta-card"><div id="cta" class="cta-row"></div></section>
+  </div>
+</main>
+
+<footer class="foot">
+  <span>abtract / experiments</span>
+  <span><a href="/api/docs">API</a> · <a href="/dashboard">Dashboard</a></span>
+</footer>
+`;

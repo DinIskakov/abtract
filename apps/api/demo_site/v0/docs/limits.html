@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limits & quotas · Zephyr Compute</title>
+<meta name="description" content="Timeouts, memory, concurrency and payload limits for Zephyr functions and sandboxes.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-root="../" data-page="docs">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="../index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+<div class="container docs-layout">
+<aside class="docs-sidebar">
+  <h5>Getting started</h5>
+  <ul>
+    <li><a href="index.html">Overview &amp; guides</a></li>
+    <li><a href="quickstart.html">Quickstart</a></li>
+  </ul>
+  <h5>Reference</h5>
+  <ul>
+    <li><a href="limits.html" class="active">Limits &amp; quotas</a></li>
+    <li><a href="python-versions.html">Python versions</a></li>
+    <li><a href="regions.html">Regions</a></li>
+  </ul>
+</aside>
+<article class="docs-content">
+
+<h1>Limits &amp; quotas</h1>
+<p class="lede">Platform limits that apply to every workspace. Enterprise customers can request higher limits through their account team.</p>
+
+<h2>Functions</h2>
+<p>Limits for containers started with <code>@app.function</code>, including web endpoints and scheduled jobs.</p>
+<div class="table-wrap"><table class="table">
+  <thead><tr><th>Limit</th><th>Value</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Default timeout</td><td>5 minutes</td><td>Override with <code>timeout=</code> on the decorator.</td></tr>
+    <tr><td>Maximum timeout</td><td>12 hours</td><td>Applies to a single function call.</td></tr>
+    <tr><td>Maximum memory</td><td>512 GiB</td><td>Requested with <code>memory=</code> in MiB.</td></tr>
+    <tr><td>Maximum input size</td><td>2 MiB</td><td>Arguments are pickled; pass large data through a volume.</td></tr>
+    <tr><td>Maximum output size</td><td>8 MiB</td><td>Return values above this raise <code>ResultTooLarge</code>.</td></tr>
+    <tr><td>Concurrent containers</td><td>Depends on plan</td><td>See <a href="../pricing.html">pricing</a>.</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Sandboxes</h2>
+<p>Sandboxes are interactive containers you start with <code>zephyr.Sandbox.create()</code>, for example to run untrusted code or an agent loop. Expand a limit to see its value.</p>
+<div class="accordion" id="sandbox-limits">
+  <div class="acc-item" data-key="sandbox-timeout">
+    <button type="button" class="acc-btn" aria-expanded="false">Maximum sandbox timeout <span class="chev">&#9660;</span></button>
+    <div class="acc-panel"></div>
+  </div>
+  <div class="acc-item" data-key="sandbox-memory">
+    <button type="button" class="acc-btn" aria-expanded="false">Maximum sandbox memory <span class="chev">&#9660;</span></button>
+    <div class="acc-panel"></div>
+  </div>
+  <div class="acc-item" data-key="sandbox-concurrency">
+    <button type="button" class="acc-btn" aria-expanded="false">Maximum concurrent sandboxes <span class="chev">&#9660;</span></button>
+    <div class="acc-panel"></div>
+  </div>
+  <div class="acc-item" data-key="sandbox-disk">
+    <button type="button" class="acc-btn" aria-expanded="false">Ephemeral disk per sandbox <span class="chev">&#9660;</span></button>
+    <div class="acc-panel"></div>
+  </div>
+</div>
+
+<h2>Need more?</h2>
+<p>Enterprise workspaces can raise most of these limits. <a href="../contact.html">Contact us</a> with the limit you need and the workload behind it.</p>
+<div class="docs-footer-nav"><a href="quickstart.html">&larr; Quickstart</a><a href="python-versions.html">Python versions &rarr;</a></div>
+
+</article>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="../pricing.html">Pricing</a></li>
+        <li><a href="../docs/index.html">Documentation</a></li>
+        <li><a href="../newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../contact.html">Contact</a></li>
+        <li><a href="../waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+<script src="../assets/limits.js" defer></script>
+</body>
+</html>

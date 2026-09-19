@@ -45,8 +45,10 @@ htmlcov/
 
 # Environment Variables
 .env
+.env.*
 .env*.local
 !.env.example
+!.env.*.example
 
 # Local evaluation artifacts
 /docs/
@@ -62,3 +64,8 @@ bun.lockb.bak
 .DS_Store
 *.pem
 Thumbs.db
+
+# Agent benchmark storage
+*.pyc
+data/
+.modal/
