@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing · Zephyr Compute</title>
+<meta name="description" content="Per-second GPU pricing for H100, A100, L40S and T4, plus Starter, Team and Enterprise plans.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-root="" data-page="pricing">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+
+<section class="page-hero">
+  <div class="container">
+    <h1>Simple, usage-based pricing</h1>
+    <p class="lede">Pay per second for exactly the compute you use. No minimums, no idle charges, no surprise egress bills.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:32px">
+  <div class="container">
+    <h2>GPU on-demand rates</h2>
+    <p class="rate-note">All prices in USD per GPU-hour, billed per second. Reserved capacity and volume discounts are available on Enterprise.</p>
+    <div class="rate-card"><canvas id="gpu-rates" width="720" height="276" aria-label="GPU rate card"></canvas></div>
+
+    <aside class="legacy-rates" style="display:none">
+      <h3>GPU rate card</h3>
+      <p class="muted">2024 edition</p>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>GPU</th><th>Memory</th><th>Price per hour</th></tr></thead>
+        <tbody>
+          <tr><td>NVIDIA H100</td><td>80 GB</td><td>$4.76</td></tr>
+          <tr><td>NVIDIA A100</td><td>80 GB</td><td>$3.40</td></tr>
+          <tr><td>NVIDIA L40S</td><td>48 GB</td><td>$2.30</td></tr>
+          <tr><td>NVIDIA T4</td><td>16 GB</td><td>$0.75</td></tr>
+        </tbody>
+      </table></div>
+    </aside>
+
+    <h3>CPU and memory</h3>
+    <p class="muted" style="margin-top:0">Every container also consumes CPU and memory, billed per second alongside any GPU.</p>
+    <div class="table-wrap" style="max-width:640px"><table class="table">
+      <thead><tr><th>Resource</th><th>Price</th></tr></thead>
+      <tbody>
+        <tr><td>CPU</td><td>$0.045 per vCPU-hour</td></tr>
+        <tr><td>Memory</td><td>$0.008 per GiB-hour</td></tr>
+        <tr><td>Egress</td><td>Free</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Plans</h2>
+    <p class="section-intro">Every plan uses the same on-demand rates. Plans differ in concurrency, collaboration features and support.</p>
+    <div class="tabs" role="tablist" id="plan-tabs">
+      <button type="button" role="tab" data-plan="starter" aria-selected="false">Starter</button>
+      <button type="button" role="tab" data-plan="team" aria-selected="false">Team</button>
+      <button type="button" role="tab" data-plan="enterprise" aria-selected="true" class="active">Enterprise</button>
+    </div>
+    <div class="card plan-panel" id="plan-panel" role="tabpanel">
+    <div class="plan-head"><span class="plan-name">Enterprise</span><span class="plan-price">Custom</span></div>
+    <p class="plan-tagline">For companies running large production workloads.</p>
+    <ul class="plan-bullets">
+      <li>Reserved and dedicated GPU capacity with volume discounts</li>
+      <li>Unlimited concurrent containers</li>
+      <li>Private networking and VPC peering</li>
+      <li>Priority support with a one hour response target</li>
+      <li>SOC 2 Type II report and HIPAA BAA available</li>
+    </ul>
+    <a class="btn btn-primary" href="contact.html">Talk to sales</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Frequently asked questions</h2>
+    <div class="faq" style="margin-top:32px">
+      <div><h4>How is usage billed?</h4><p>Per second of container runtime, rounded up to the nearest second. You are not billed while a function is scaled to zero.</p></div>
+      <div><h4>Can I set a spending limit?</h4><p>Yes. Every workspace has a monthly budget you can set in the dashboard; deployments pause when it is reached.</p></div>
+      <div><h4>Do you offer reserved capacity?</h4><p>Enterprise customers can reserve dedicated GPUs for one or three year terms at a discount to on-demand rates.</p></div>
+      <div><h4>What payment methods do you accept?</h4><p>Credit card for Starter and Team; invoicing with net-30 terms for Enterprise.</p></div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="docs/index.html">Documentation</a></li>
+        <li><a href="newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+<script src="assets/pricing.js" defer></script>
+</body>
+</html>

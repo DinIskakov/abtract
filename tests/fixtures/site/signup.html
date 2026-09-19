@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head><title>Newsletter - Acme Cloud</title></head>
+<body>
+<nav><a href="index.html">Home</a> | <a href="pricing.html">Pricing</a></nav>
+<h1>Subscribe to our newsletter</h1>
+<form method="post" action="api/newsletter">
+  <label for="email">Email address</label>
+  <input type="email" id="email" name="email" placeholder="you@example.com" required>
+  <input type="hidden" name="source" value="signup-page">
+  <label for="plan">Plan</label>
+  <select id="plan" name="plan">
+    <option value="free">Free</option>
+    <option value="pro">Pro</option>
+  </select>
+  <label><input type="checkbox" name="terms" value="yes"> I agree to the terms</label>
+  <button type="button" onclick="alert('js only')">Fancy JS button</button>
+  <button type="submit">Subscribe</button>
+</form>
+</body>
+</html>

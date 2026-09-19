@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web endpoints · Zephyr Compute</title>
+<meta name="description" content="Expose any function as an HTTPS endpoint with a single decorator.">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body data-root="../../" data-page="docs">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="../../index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+<div class="container docs-layout">
+<aside class="docs-sidebar">
+  <h5>Getting started</h5>
+  <ul>
+    <li><a href="../index.html">Overview &amp; guides</a></li>
+    <li><a href="../quickstart.html">Quickstart</a></li>
+  </ul>
+  <h5>Reference</h5>
+  <ul>
+    <li><a href="../limits.html">Limits &amp; quotas</a></li>
+    <li><a href="../python-versions.html">Python versions</a></li>
+    <li><a href="../regions.html">Regions</a></li>
+  </ul>
+</aside>
+<article class="docs-content">
+
+<h1>Web endpoints</h1>
+<p class="lede">Expose any function as an HTTPS endpoint with a single decorator.</p>
+
+<p>Add <code>@app.web_endpoint()</code> to a function and Zephyr serves it over HTTPS with autoscaling, TLS and request logging. Endpoints scale to zero between requests and back up in well under a second.</p>
+<pre class="code"><code><span class="kw">import</span> zephyr
+
+app = zephyr.App(<span class="st">"api"</span>)
+
+<span class="dec">@app.function</span>(gpu=<span class="st">"L40S"</span>)
+<span class="dec">@app.web_endpoint</span>(method=<span class="st">"POST"</span>)
+<span class="kw">def</span> <span class="fn">generate</span>(prompt: str, max_tokens: int = 256) -&gt; dict:
+    <span class="kw">return</span> {<span class="st">"text"</span>: run_model(prompt, max_tokens)}</code></pre>
+<p>After <code>zephyr deploy</code> the endpoint is available at <code>https://&lt;workspace&gt;--api-generate.zephyr.run</code>. Query parameters and JSON bodies are mapped to function arguments automatically.</p>
+<h2>Streaming</h2>
+<p>Return a generator to stream the response as server-sent events. Set <code>websocket=True</code> on the decorator for bidirectional streaming.</p>
+<h2>Authentication</h2>
+<p>Endpoints are public by default. Pass <code>requires_proxy_auth=True</code> to require a workspace token in the <code>Authorization</code> header.</p>
+
+<div class="docs-footer-nav"><a href="../index.html">&larr; All guides</a><a href="../quickstart.html">Quickstart &rarr;</a></div>
+
+</article>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="../../pricing.html">Pricing</a></li>
+        <li><a href="../../docs/index.html">Documentation</a></li>
+        <li><a href="../../newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="../../about.html">About</a></li>
+        <li><a href="../../contact.html">Contact</a></li>
+        <li><a href="../../waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

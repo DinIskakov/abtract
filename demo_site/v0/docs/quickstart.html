@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quickstart · Zephyr Compute</title>
+<meta name="description" content="Install the Zephyr CLI and deploy your first GPU function.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body data-root="../" data-page="docs">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="../index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+<div class="container docs-layout">
+<aside class="docs-sidebar">
+  <h5>Getting started</h5>
+  <ul>
+    <li><a href="index.html">Overview &amp; guides</a></li>
+    <li><a href="quickstart.html" class="active">Quickstart</a></li>
+  </ul>
+  <h5>Reference</h5>
+  <ul>
+    <li><a href="limits.html">Limits &amp; quotas</a></li>
+    <li><a href="python-versions.html">Python versions</a></li>
+    <li><a href="regions.html">Regions</a></li>
+  </ul>
+</aside>
+<article class="docs-content">
+
+<h1>Quickstart</h1>
+<p class="lede">Deploy your first GPU function in about five minutes. You need a working Python installation and a Zephyr account.</p>
+
+<ol class="steps" style="margin-top:32px">
+  <li>
+    <h3>Install the CLI</h3>
+    <p>The Zephyr CLI and Python SDK ship together in one package. Install it from PyPI:</p>
+    <pre class="code"><code><span class="sh">$</span> pip install zephyr-cli</code></pre>
+    <p>This puts the <code>zephyr</code> command on your path and makes <code>import zephyr</code> available.</p>
+  </li>
+  <li>
+    <h3>Authenticate</h3>
+    <pre class="code"><code><span class="sh">$</span> zephyr login</code></pre>
+    <p>Your browser opens to confirm the device. The token is stored in <code>~/.zephyr/token</code>.</p>
+  </li>
+  <li>
+    <h3>Write a function</h3>
+    <p>Save the following as <code>hello.py</code>. The decorator tells Zephyr which GPU to attach and which image to build.</p>
+    <pre class="code"><code><span class="kw">import</span> zephyr
+
+app = zephyr.App(<span class="st">"hello"</span>)
+
+<span class="dec">@app.function</span>(gpu=<span class="st">"T4"</span>)
+<span class="kw">def</span> <span class="fn">gpu_info</span>():
+    <span class="kw">import</span> subprocess
+    <span class="kw">return</span> subprocess.check_output([<span class="st">"nvidia-smi"</span>]).decode()
+
+<span class="kw">if</span> __name__ == <span class="st">"__main__"</span>:
+    <span class="kw">with</span> app.run():
+        print(gpu_info.remote())</code></pre>
+  </li>
+  <li>
+    <h3>Run it, then deploy it</h3>
+    <pre class="code"><code><span class="sh">$</span> zephyr run hello.py     <span class="cm"># one-off run, streams logs to your terminal</span>
+<span class="sh">$</span> zephyr deploy hello.py  <span class="cm"># persistent deployment that scales to zero</span></code></pre>
+    <p>The first run builds and caches the image; subsequent runs start in well under a second.</p>
+  </li>
+</ol>
+
+<h2>Next steps</h2>
+<ul>
+  <li>Browse the <a href="index.html">guides</a> to add web endpoints, schedules, volumes and secrets.</li>
+  <li>Check the <a href="limits.html">limits</a> before running long jobs.</li>
+  <li>Choose a <a href="regions.html">region</a> close to your users or your data.</li>
+</ul>
+<div class="docs-footer-nav"><a href="index.html">&larr; Documentation</a><a href="limits.html">Limits &amp; quotas &rarr;</a></div>
+
+</article>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="../pricing.html">Pricing</a></li>
+        <li><a href="../docs/index.html">Documentation</a></li>
+        <li><a href="../newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../contact.html">Contact</a></li>
+        <li><a href="../waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

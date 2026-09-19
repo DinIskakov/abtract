@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog · Zephyr Compute</title>
+<meta name="description" content="Release notes for the Zephyr Compute platform, SDK and CLI.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-root="" data-page="changelog">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+
+<section class="page-hero">
+  <div class="container">
+    <h1>Changelog</h1>
+    <p class="lede">New features, improvements and fixes, shipped roughly every two weeks.</p>
+  </div>
+</section>
+<section class="section" style="padding-top:24px">
+  <div class="container" style="max-width:860px">
+    <div class="release">
+      <div><span class="ver">v2.4.0</span><span class="date">September 2, 2026</span></div>
+      <div><span class="tag">Feature</span><span class="tag">Performance</span>
+        <ul>
+          <li>Sandboxes are now generally available, with snapshot and restore.</li>
+          <li><code>zephyr logs --follow</code> streams logs from all containers of a deployment.</li>
+          <li>Web endpoint cold starts are about 30% faster thanks to lazy CUDA context creation.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="release">
+      <div><span class="ver">v2.3.1</span><span class="date">August 14, 2026</span></div>
+      <div><span class="tag">Fix</span>
+        <ul>
+          <li>Fixed a race that could leave a volume mounted read-only after a container restart.</li>
+          <li>The CLI no longer prompts for login when a token is already present in the environment.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="release">
+      <div><span class="ver">v2.3.0</span><span class="date">July 22, 2026</span></div>
+      <div><span class="tag">Feature</span>
+        <ul>
+          <li>Volumes gained point-in-time snapshots and a <code>zephyr volume restore</code> command.</li>
+          <li>Single sign-on for Team workspaces.</li>
+          <li>Per-function spending limits.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="release">
+      <div><span class="ver">v2.2.0</span><span class="date">June 9, 2026</span></div>
+      <div><span class="tag">Feature</span>
+        <ul>
+          <li>New GPU region in Asia-Pacific.</li>
+          <li>Scheduled jobs can now be paused from the dashboard.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="docs/index.html">Documentation</a></li>
+        <li><a href="newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>

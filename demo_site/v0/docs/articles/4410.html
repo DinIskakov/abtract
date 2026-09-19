@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scheduled jobs · Zephyr Compute</title>
+<meta name="description" content="Run functions on a cron or interval schedule with built-in retries.">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body data-root="../../" data-page="docs">
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="../../index.html" aria-label="Zephyr Compute home"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Main"></nav>
+  </div>
+</header>
+<main>
+<div class="container docs-layout">
+<aside class="docs-sidebar">
+  <h5>Getting started</h5>
+  <ul>
+    <li><a href="../index.html">Overview &amp; guides</a></li>
+    <li><a href="../quickstart.html">Quickstart</a></li>
+  </ul>
+  <h5>Reference</h5>
+  <ul>
+    <li><a href="../limits.html">Limits &amp; quotas</a></li>
+    <li><a href="../python-versions.html">Python versions</a></li>
+    <li><a href="../regions.html">Regions</a></li>
+  </ul>
+</aside>
+<article class="docs-content">
+
+<h1>Scheduled jobs</h1>
+<p class="lede">Run functions on a cron or interval schedule with built-in retries.</p>
+
+<p>Any function can run on a schedule. Zephyr keeps the schedule in the control plane, so nothing needs to stay running between invocations.</p>
+<pre class="code"><code><span class="dec">@app.function</span>(schedule=zephyr.Cron(<span class="st">"0 */6 * * *"</span>, timezone=<span class="st">"Europe/Berlin"</span>), retries=3)
+<span class="kw">def</span> <span class="fn">refresh_embeddings</span>():
+    ...</code></pre>
+<p>Use <code>zephyr.Period(hours=1)</code> for interval schedules. Overlapping runs are skipped by default; set <code>allow_overlap=True</code> to change that.</p>
+<h2>Pausing and history</h2>
+<p>Schedules can be paused and resumed from the dashboard, and the last 90 days of runs are kept with their logs.</p>
+
+<div class="docs-footer-nav"><a href="../index.html">&larr; All guides</a><a href="../quickstart.html">Quickstart &rarr;</a></div>
+
+</article>
+</div>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <span class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#4f46e5"/><path d="M7 10h11a3 3 0 1 0-3-3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M5 15h14a3 3 0 1 1-3 3" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M8 20h7" stroke="#a5f3fc" stroke-width="2.2" stroke-linecap="round"/></svg><span>Zephyr Compute</span></span>
+      <p>Serverless GPU infrastructure for teams that would rather ship models than manage clusters.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <ul>
+        <li><a href="../../pricing.html">Pricing</a></li>
+        <li><a href="../../docs/index.html">Documentation</a></li>
+        <li><a href="../../newsletter.html">Newsletter</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Company</h4>
+      <ul>
+        <li><a href="../../about.html">About</a></li>
+        <li><a href="../../contact.html">Contact</a></li>
+        <li><a href="../../waitlist.html">Join the waitlist</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p class="muted" style="font-size:14.5px;margin:0"><span class="status-dot"></span>All systems operational</p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>&copy; 2026 Zephyr Compute, Inc.</span>
+    <span>Built in San Francisco</span>
+  </div>
+</footer>
+<script src="../../assets/site.js" defer></script>
+</body>
+</html>

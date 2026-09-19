@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>abtract dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">ab</span>tract <span class="tag">A/B testing for AI agents</span></a>
+  <div class="controls">
+    <label>Site <select id="site-select"></select></label>
+    <label class="check"><input type="checkbox" id="live"> live</label>
+    <button id="refresh" class="btn">Refresh</button>
+    <a href="/" class="btn">New run</a>
+    <span id="status" class="status"></span>
+  </div>
+</header>
+
+<main id="main">
+  <section class="card" id="sec-timeline">
+    <div class="card-head">
+      <h2>Version timeline</h2>
+      <span class="sub" id="timeline-sub">latest run per site version</span>
+    </div>
+    <div class="charts3">
+      <div class="chart-box">
+        <div class="hero" id="hero-success"></div>
+        <h3>Success rate</h3>
+        <div class="chart-wrap"><canvas id="chart-success"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="hero" id="hero-cost"></div>
+        <h3>Avg cost per episode</h3>
+        <div class="chart-wrap"><canvas id="chart-cost"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="hero" id="hero-time"></div>
+        <h3>Avg time per episode</h3>
+        <div class="chart-wrap"><canvas id="chart-time"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="sec-compare">
+    <div class="card-head">
+      <h2>A vs B</h2>
+      <div class="picker">
+        <label>A <select id="run-a"></select></label>
+        <span class="vs">vs</span>
+        <label>B <select id="run-b"></select></label>
+      </div>
+    </div>
+    <div class="stat-row" id="compare-cards"></div>
+    <div class="table-wrap"><table class="tbl" id="compare-tasks"></table></div>
+  </section>
+
+  <section class="card" id="sec-run">
+    <div class="card-head">
+      <h2>Run detail</h2>
+      <div class="picker">
+        <label>Run <select id="run-select"></select></label>
+        <span id="run-meta" class="sub"></span>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="sw ok"></i> success</span>
+      <span><i class="sw fail"></i> failed</span>
+      <span><i class="sw pending"></i> not judged</span>
+      <span><i class="sw none"></i> no episode</span>
+      <span class="legend-note">each cell: <b>T</b>ext · <b>D</b>om · <b>V</b>ision agent — click a segment to open its trace</span>
+    </div>
+    <div class="table-wrap"><table class="heatmap" id="heatmap"></table></div>
+  </section>
+
+  <section class="card" id="sec-breakdown">
+    <div class="card-head"><h2>Breakdown</h2><span class="sub" id="breakdown-sub"></span></div>
+    <div class="breakdown3">
+      <div><h3>Per model</h3><table class="tbl" id="tbl-model"></table></div>
+      <div><h3>Per agent kind</h3><table class="tbl" id="tbl-agent"></table></div>
+      <div><h3>Per trap</h3><table class="tbl" id="tbl-trap"></table></div>
+    </div>
+  </section>
+
+  <section class="card" id="sec-versions">
+    <div class="card-head"><h2>Version notes</h2><span class="sub">what the optimizer changed and why</span></div>
+    <div id="versions" class="versions"></div>
+    <div id="file-viewer" class="file-viewer hidden"></div>
+  </section>
+</main>
+
+<div id="drawer-backdrop" class="backdrop hidden"></div>
+<aside id="drawer" class="drawer hidden" aria-label="episode trace">
+  <div class="drawer-head">
+    <div id="drawer-title" class="drawer-title"></div>
+    <button id="drawer-close" class="btn">Close</button>
+  </div>
+  <div id="drawer-body" class="drawer-body"></div>
+</aside>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

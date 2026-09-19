@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>abtract — A/B testing for AI agents</title>
+<meta name="description" content="See how AI agents experience your website, then let it fix itself.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/product.css">
+</head>
+<body class="product">
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">ab</span>tract</a>
+  <nav class="nav">
+    <a href="#how">How it works</a>
+    <a href="#recent">Recent jobs</a>
+    <a href="/dashboard" class="btn">Dashboard</a>
+  </nav>
+</header>
+
+<main class="landing">
+  <section class="hero-wrap">
+    <span class="eyebrow"><i></i> A/B testing for AI agents</span>
+    <h1><span class="logo">ab</span>tract</h1>
+    <p class="lede">See how AI agents experience your website, then let it fix itself.</p>
+
+    <form id="intake" class="url-form" autocomplete="off" novalidate>
+      <input id="url" name="url" class="url" type="text" inputmode="url" placeholder="https://your-site.com" spellcheck="false" autofocus aria-label="Website URL">
+      <button type="submit" id="go" class="btn primary lg">Run the swarm</button>
+    </form>
+    <div class="hero-actions">
+      <button type="button" id="demo" class="btn ghost">Try with the demo site</button>
+      <span id="form-status" class="form-status" role="status"></span>
+    </div>
+
+    <details class="options" id="options" open>
+      <summary>Options <span class="sub" id="options-sub"></span></summary>
+      <div class="options-grid">
+        <div class="opt">
+          <h3>Models</h3>
+          <div id="models" class="checks"><span class="muted">loading…</span></div>
+        </div>
+        <div class="opt">
+          <h3>Agents</h3>
+          <div id="agents" class="checks"></div>
+          <p class="hint">Each model × agent kind attempts every task.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section id="how" class="section">
+    <div class="section-head"><h2>How it works</h2><span class="sub">one URL in, a better site out</span></div>
+    <div class="how-grid">
+      <div class="how-step">
+        <span class="num">1</span>
+        <h3>Mirror</h3>
+        <p>We fetch your site and host a snapshot, then Gemini writes realistic tasks a visitor might ask an agent to do on it.</p>
+        <span class="arrow">→</span>
+      </div>
+      <div class="how-step">
+        <span class="num">2</span>
+        <h3>Swarm</h3>
+        <p>Text, DOM and vision agents driven by several LLMs attempt every task. We score success, steps, time and cost, and record every trace.</p>
+        <span class="arrow">→</span>
+      </div>
+      <div class="how-step">
+        <span class="num">3</span>
+        <h3>Rewrite loop</h3>
+        <p>Gemini rewrites the pages that tripped agents, we host the new version and swarm again. Every iteration is measured A/B.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="recent" class="section">
+    <div class="section-head"><h2>Recent jobs</h2><a href="/dashboard" class="sub">open the full dashboard →</a></div>
+    <div class="card"><div id="jobs" class="jobs-list"><span class="muted">loading…</span></div></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>abtract · hackathon build</span>
+  <span><a href="/api/docs">API</a> · <a href="/dashboard">Dashboard</a></span>
+</footer>
+
+<script src="/static/landing.js"></script>
+</body>
+</html>

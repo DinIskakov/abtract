@@ -45,8 +45,10 @@ htmlcov/
 
 # Environment Variables
 .env
+.env.*
 .env*.local
 !.env.example
+!.env.*.example
 
 # Logs
 npm-debug.log*
@@ -59,3 +61,8 @@ bun.lockb.bak
 .DS_Store
 *.pem
 Thumbs.db
+
+# Agent benchmark storage
+*.pyc
+data/
+.modal/

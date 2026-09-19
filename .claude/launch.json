@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "abtract.dashboard.app", "--port", "8001"],
+      "port": 8001
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "abtract.hosting.serve", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}
