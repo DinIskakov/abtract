@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 
 
 class TokenUsage(BaseModel):
-    # Total input includes cache reads/writes; reasoning is a subset of output.
+    # Total input includes cache reads/writes. Output semantics are harness-specific:
+    # Codex includes reasoning; Gemini CLI exposes candidate output only.
     input_tokens: int | None = None
     cached_input_tokens: int | None = None
     cache_write_input_tokens: int | None = None
@@ -96,6 +97,10 @@ def parse_telemetry(
     stdout: str,
     requested_model: str | None,
 ) -> Telemetry:
+    if harness == "gemini":
+        from app.gemini_telemetry import parse_gemini_telemetry
+
+        return parse_gemini_telemetry(stdout)
     result = Telemetry()
     events: list[dict[str, Any]] = []
     for line in ANSI.sub("", stdout).splitlines():
