@@ -4,7 +4,8 @@
 It waits for the batch and returns one result per harness × task × repetition.
 Runs execute concurrently using Modal's `.aio` APIs and `asyncio.gather`, each in a
 fresh Modal Sandbox. A per-request semaphore defaults to five active runs. There is no
-database, background queue, scoring, or custom agent tooling.
+database or background queue. Evaluation and proposal endpoints operate outside
+the sandboxes; harnesses retain their native tools.
 
 ## Setup
 
@@ -13,7 +14,7 @@ From `apps/api`:
 ```sh
 uv sync
 cp .env.example .env
-# Set OPENAI_API_KEY and/or ANTHROPIC_API_KEY in .env.
+# Set OPENAI_API_KEY, ANTHROPIC_API_KEY, and/or GEMINI_API_KEY in .env.
 uv run python -m modal setup
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -30,6 +31,11 @@ sandboxes. Configure these in the hosting platform's secret/environment settings
 - `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`: authenticate the backend to Modal.
 - `OPENAI_API_KEY`: authenticate Codex to OpenAI (separate API billing).
 - `ANTHROPIC_API_KEY`: needed only when running Claude.
+- `GEMINI_API_KEY`: Gemini CLI runs and the optional semantic judge/proposer.
+- `GEMINI_MODEL`: explicit judge/proposer and Gemini CLI default model
+  (`gemini-3.8-flash`).
+- `MODAL_PROXY_TOKEN`: separate inference-endpoint credential; not a Modal
+  deployment token and not required for the existing native provider runs.
 
 Create Modal credentials in the Modal dashboard's token settings. Team/Enterprise
 workspaces can use a dedicated service user with Contributor access to the target
@@ -38,7 +44,7 @@ SDK does not receive them through this app's Pydantic `.env` settings.
 See [Modal service users](https://modal.com/docs/guide/service-users).
 
 The current endpoint is a development MVP, not a production deployment: it still
-needs API authentication, global admission/concurrency limits, and durable result storage
+needs API authentication, global admission/concurrency limits, and shared durable storage
 before exposing it publicly. Long batches also need background execution rather
 than relying on a single HTTP request staying open.
 
@@ -58,7 +64,8 @@ curl --max-time 1200 http://127.0.0.1:8000/api/runs \
 ```
 
 An optional `model` on each harness configuration selects the model; omit it to
-use the CLI default. CLI versions are pinned in `app/runs.py`. The first request
+use the Codex/Claude CLI default or configured `GEMINI_MODEL`. `name` accepts
+`codex`, `claude`, or `gemini`. CLI versions are pinned in `app/runs.py`. The first request
 may take longer while Modal builds the images. Subsequent runs reuse images but
 never reuse a task's sandbox. Native unattended execution permissions are enabled
 inside the isolated sandbox, with no MCP servers, plugins, or custom tools added.
@@ -100,8 +107,9 @@ Each API run result includes `execution_duration_seconds` and a `telemetry` obje
 parsed from native CLI events, independently of the agent's answer file:
 
 - `tokens`: total input, cached input, cache-write input, output, and reasoning
-  tokens where reported. Input includes cache reads/writes; reasoning is a subset
-  of output and is not billed a second time by our estimator.
+  tokens where reported. Input includes cache reads/writes. Codex output includes
+  reasoning and our estimator does not bill it twice. Gemini CLI exposes candidate
+  output tokens but omits reasoning usage; its cost remains unknown.
 - `tool_calls`, `tool_calls_by_type`, `failed_tool_calls`: observed native tool
   events, deduplicated by tool-call ID. Different harnesses expose different tool
   categories, so raw counts are descriptive rather than a universal quality score.
@@ -122,9 +130,119 @@ The original stdout/stderr remain available for auditing. Claude parsing has
 fixture coverage; live verification requires an Anthropic API key. Metrics do not
 grade correctness, and estimated cost is not a billing receipt.
 
-Responses are not persisted. Save the response if you need it later. Requests can
+Run, evaluation, proposal, and evaluation-input JSON records are saved locally in
+the gitignored root `docs/artifacts/` directory. Set `ARTIFACT_DIR` to change it.
+Files are written atomically with private permissions. This is a single-backend
+MVP store, not a distributed database. Requests can
 be long-lived; keep batches small and configure client/proxy timeouts accordingly.
 The endpoint caps each request at 20 runs. There is no global concurrency limit.
+
+## Request capture and frozen variants
+
+Set `capture_http: true` on **both** A and B. The sandbox starts a separate
+mitmproxy process and configures proxy/CA environment variables for native HTTP
+clients. No custom agent tool is installed. It records same-origin public GETs
+that honor these settings: URL, status, timing, content type, original/modified
+SHA-256 hashes, response bodies, and patch outcomes. Authenticated/cookie-bearing
+response bodies are not retained or modified in this MVP.
+
+`observations.native_tool_events` contains exposed native tool arguments/results
+with trace-line references. Bodies/tool events are bounded to 32 KiB and 200 events,
+with truncation flags; known credentials and sensitive URL query parameters are
+redacted. Hashes cover full decoded entity bytes before redaction/truncation.
+The harness user cannot write the root-owned proxy records. Raw native stdout and
+stderr remain harness-authored evidence, not an independent audit trail.
+
+Provider-hosted search and clients bypassing the proxy remain outside coverage.
+The `coverage`, `capture_error`, `applied_patch_ids`, and `unobserved_patch_ids`
+fields make this explicit. An applied response proves delivery, not that the agent
+used it. Unverified variant exposure cannot support an A/B improvement claim.
+
+To test B, also supply `variant_id` and `patches`:
+
+```json
+{
+  "capture_http": true,
+  "variant_id": "docs-v2",
+  "patches": [{
+    "patch_id": "sandbox-example",
+    "url": "https://example.com/docs/sandboxes",
+    "expected_sha256": "<SHA-256 of the original UTF-8 response body>",
+    "old_text": "Exact original text occurring once",
+    "new_text": "Improved text"
+  }]
+}
+```
+
+These fields extend the usual `/api/runs` request. One patch per URL is supported;
+combine related edits into one replacement. A hash mismatch, ambiguous span,
+unsupported encoding, or ineligible response leaves the original intact and is
+recorded. Patches never modify the actual website. Each run records platform URL,
+task hash, variant identity, and patch-set hash.
+
+## Evaluate, inspect failures, then propose
+
+- `POST /api/evaluations`: submit run records and explicit task rubrics.
+- `POST /api/proposals`: submit the saved evaluation, identical run records, and
+  source documents (`url`, `body`). Gemini proposes exact replacement patches.
+- `GET /api/runs/{run_id}`, `/api/evaluations/{evaluation_id}`, and
+  `/api/proposals/{proposal_id}` reload records for the frontend.
+
+An evaluation request has this shape (`runs` contains full `/api/runs` results):
+
+```json
+{
+  "runs": [],
+  "semantic_judge": true,
+  "rubrics": [{
+    "task_id": "create-sandbox",
+    "task_index": 0,
+    "task": "How do I create a sandbox? Include Python code.",
+    "criteria": [
+      {"id": "syntax", "kind": "python_syntax", "description": "Python parses"},
+      {"id": "correctness", "kind": "semantic", "description": "Uses an initialized Modal App", "reference_answer": "Resolve the App with modal.App.lookup before passing it to modal.Sandbox.create, or use an active app.run context."}
+    ]
+  }]
+}
+```
+
+Replace `runs: []` with at least one actual run. Task text and indices must match.
+Deterministic criterion kinds are `required_text`, `forbidden_text`,
+`required_sources` (each uses `values`), `python_syntax`, `duration_budget`, and
+`cost_budget` (each budget uses `limit`). Python checks parse code without executing
+it; source checks verify reported URLs, not factual support. Cost checks use the
+available model-cost estimate and exclude unknown charges.
+
+Semantic checks require a supplied reference answer and explicit
+`semantic_judge: true`. Gemini must return exact answer quotes as evidence.
+Missing metrics, disabled judging, and judge failures yield `unknown`, not a
+fabricated pass. Each check includes its method, outcome, reason, evidence, and
+error, allowing the frontend to show where a task failed. Reports record grader,
+rubric, model, and run versions. Variant exposure is separate from answer quality.
+
+Proposals link to failed check IDs and exact source spans. Their patch-set hash is
+fixed before B runs; the endpoint never applies or publishes them automatically.
+It rejects changed evaluation/run evidence and invented source spans. A proposer
+may return no changes when failures do not justify a platform edit. Proposed
+changes are hypotheses, not established causes or improvements. Run the same
+rubrics on B, repeat trials, and check held-out tasks before claiming a gain.
+
+## Modal model endpoints
+
+Native harness API credentials and Modal inference credentials are separate.
+The requested dedicated endpoint commands are:
+
+```sh
+uv run modal endpoint create --name uptrack-kimi-k3 --model moonshotai/Kimi-K3
+uv run modal endpoint create --name uptrack-qwen --model Qwen/Qwen3.6-27B-FP8
+uv run modal endpoint list --json
+```
+
+Authenticated endpoints require a workspace proxy token. Dedicated endpoints
+scale to zero by default and incur compute charges while running. GPU deployment
+requires the workspace's billing setup; endpoint creation does not automatically
+connect a new model to the evaluation harness matrix. Model-provider integration
+for these endpoints is a separate step.
 
 ## Tests
 
@@ -133,6 +251,7 @@ uv run pytest -q
 # Live tests create billable sandboxes and model requests:
 UPTRACK_LIVE=1 UPTRACK_HARNESS=codex UPTRACK_MODEL=gpt-5.4-mini uv run pytest tests/test_live_runs.py -q
 UPTRACK_LIVE=1 UPTRACK_HARNESS=claude uv run pytest tests/test_live_runs.py -q
+UPTRACK_LIVE=1 UPTRACK_HARNESS=gemini UPTRACK_MODEL=gemini-3.8-flash uv run pytest tests/test_live_runs.py -q
 ```
 
 Unit tests substitute Modal to check orchestration, validation, and cleanup.

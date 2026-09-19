@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import health, runs
+from app.routers import evaluations, health, runs
 
 
 def create_app() -> FastAPI:
@@ -26,6 +26,7 @@ def create_app() -> FastAPI:
     # Include routers under /api
     application.include_router(health.router, prefix="/api")
     application.include_router(runs.router, prefix="/api")
+    application.include_router(evaluations.router, prefix="/api")
 
     @application.get("/")
     async def root() -> dict[str, str]:

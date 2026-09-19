@@ -254,3 +254,82 @@ def test_failed_run_does_not_cancel_other_runs(backend):
     assert [r["status"] for r in results] == ["error", "completed"]
     for sandbox in sandboxes:
         sandbox.terminate.aio.assert_awaited_once()
+
+
+def test_capture_survives_failed_harness_and_reports_patch_exposure(backend):
+    factory, _ = backend
+    original = factory.side_effect
+
+    async def create(**kwargs):
+        sandbox = await original(**kwargs)
+        harness_process = sandbox.exec.aio.return_value
+        harness_process.wait.aio.return_value = 1
+        harness_process.stdout.read.aio.return_value = json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "curl https://modal.com/",
+                },
+            }
+        )
+        setup = MagicMock()
+        setup.wait.aio = AsyncMock(return_value=0)
+        sandbox.exec.aio.side_effect = [setup, harness_process]
+        sandbox.filesystem.read_text.aio.return_value = json.dumps(
+            {
+                "url": "https://modal.com/",
+                "method": "GET",
+                "started_at": 1,
+                "duration_ms": 5,
+                "status_code": 200,
+                "patch": {"patch_id": "example", "status": "applied"},
+            }
+        )
+        sandbox.filesystem.stat.aio.side_effect = FileNotFoundError()
+        return sandbox
+
+    factory.side_effect = create
+    result = (
+        TestClient(app)
+        .post(
+            "/api/runs",
+            json={
+                **BODY,
+                "capture_http": True,
+                "variant_id": "B",
+                "patches": [
+                    {
+                        "patch_id": "example",
+                        "url": "https://modal.com/",
+                        "expected_sha256": "a" * 64,
+                        "old_text": "old",
+                        "new_text": "new",
+                    }
+                ],
+            },
+        )
+        .json()[0]
+    )
+    assert result["status"] == "error"
+    assert result["observations"]["applied_patch_ids"] == ["example"]
+    assert result["observations"]["unobserved_patch_ids"] == []
+    assert result["observations"]["capture_error"] is None
+    assert len(result["observations"]["native_tool_events"]) == 1
+    assert result["variant_id"] == "B"
+
+
+def test_failed_wait_preserves_available_native_trace(backend):
+    factory, _ = backend
+    original = factory.side_effect
+
+    async def create(**kwargs):
+        sandbox = await original(**kwargs)
+        sandbox.exec.aio.return_value.wait.aio.side_effect = TimeoutError("expired")
+        sandbox.exec.aio.return_value.stdout.read.aio.return_value = "partial trace"
+        return sandbox
+
+    factory.side_effect = create
+    result = TestClient(app).post("/api/runs", json=BODY).json()[0]
+    assert result["status"] == "error"
+    assert result["stdout"] == "partial trace"
