@@ -95,15 +95,15 @@
       input.checked = (quick ? defaults.slice(0, 1) : defaults).includes(input.value);
     });
     document.querySelectorAll('input[name="agent"]').forEach(input => { input.checked = !quick || input.value !== 'vision'; });
-    $('#go').textContent = quick ? 'Run quick scan' : 'Run full audit';
+    $('#go').textContent = quick ? 'Run quick scan ↗' : 'Run full audit ↗';
     updateSummary();
   }
   function updateSummary() {
     const m = checked('model').length, a = checked('agent').length;
-    $('#options-sub').textContent = `${m} model${m === 1 ? '' : 's'} × ${a} agent kind${a === 1 ? '' : 's'}`;
+    $('#options-sub').textContent = `${m} model${m === 1 ? '' : 's'} × ${a} agent${a === 1 ? '' : 's'}`;
     $('#scan-description').textContent = $('#scan-mode').value === 'quick'
       ? `Up to 3 short tasks × ${m} model${m === 1 ? '' : 's'} × ${a} agent kinds. Expand to a full audit from your results.`
-      : 'Every task across your selected models and agents. Results appear as they finish; a full audit can take several minutes.';
+      : 'All tasks. Parallel agents. Live results.';
   }
 
   // ---------------------------------------------------------------- recent jobs
@@ -118,7 +118,7 @@
     try { jobs = await api('/api/jobs?limit=12'); }
     catch (e) { box.innerHTML = ''; box.append(el('div', { class: 'empty' }, `could not load jobs: ${e.message}`)); return; }
     box.innerHTML = '';
-    if (!jobs.length) { box.append(el('div', { class: 'empty' }, 'No jobs yet. Paste a URL above or try the demo site.')); return; }
+    if (!jobs.length) { box.append(el('div', { class: 'empty' }, 'Your experiments will appear here.')); return; }
     for (const j of jobs) {
       const status = j.status || 'queued';
       const label = status === 'running' && j.phase ? `${j.phase}` : status;
@@ -168,7 +168,7 @@
     if (!demoUrl) return;
     $('#url').value = demoUrl;
     $('#url').focus();
-    setStatus('Demo site loaded: a fake GPU-cloud landing page with 10 deliberate agent traps.');
+    setStatus('Demo loaded. Configure your swarm, then run the audit.');
   });
   $('#url').addEventListener('input', () => setStatus(''));
   $('#scan-mode').addEventListener('change', applyScanMode);

@@ -92,34 +92,38 @@
     if (typeof Chart === 'undefined') return;
     const canvas = $('#' + canvasId);
     if (state.charts[canvasId]) state.charts[canvasId].destroy();
-    Chart.defaults.color = '#c3c2b7';
-    Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-    Chart.defaults.font.size = 11;
+    const css = getComputedStyle(document.documentElement);
+    const color = token => css.getPropertyValue(token).trim();
+    Chart.defaults.color = color('--muted');
+    Chart.defaults.font.family = 'Arial, Helvetica, sans-serif';
+    Chart.defaults.font.size = 14;
+    canvas.setAttribute('aria-label', labels.map((label, i) => `${label}: ${fmt(data[i])}`).join('; ') || 'No results yet');
     const last = data.length - 1;
     state.charts[canvasId] = new Chart(canvas, {
-      type: 'bar',
+      type: 'line',
       data: {
         labels,
         datasets: [{
           data,
-          backgroundColor: data.map((_, i) => i === last ? '#3987e5' : '#5598e7'),
-          borderRadius: 4, borderSkipped: 'start', barPercentage: 0.5, categoryPercentage: 0.8, maxBarThickness: 44,
+          borderColor: color('--blue'), backgroundColor: color('--blue-soft'),
+          borderWidth: 2, pointRadius: data.map((_, i) => i === last ? 4 : 3),
+          pointBackgroundColor: color('--blue'), pointHoverRadius: 6, tension: 0, fill: true,
         }],
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+        responsive: true, maintainAspectRatio: false, animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250 },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#222220', titleColor: '#fff', bodyColor: '#c3c2b7', borderColor: '#383835', borderWidth: 1,
+            backgroundColor: color('--ink'), titleColor: color('--surface'), bodyColor: color('--surface'), borderColor: color('--border'), borderWidth: 1,
             callbacks: { label: c => ` ${fmt(c.parsed.y)}` },
           },
         },
         scales: {
-          x: { grid: { display: false }, border: { color: '#383835' }, ticks: { color: '#c3c2b7' } },
+          x: { grid: { display: false }, border: { color: color('--axis') }, ticks: { color: color('--muted') } },
           y: {
-            beginAtZero: true, max: opts.max, grid: { color: '#2c2c2a' }, border: { display: false },
-            ticks: { callback: v => fmt(v), maxTicksLimit: 5, color: '#898781' },
+            beginAtZero: true, max: opts.max, grid: { color: color('--grid') }, border: { display: false },
+            ticks: { callback: v => fmt(v), maxTicksLimit: 5, color: color('--muted') },
           },
         },
       },
@@ -223,10 +227,9 @@
           const cls = !e ? 'none' : e.success === true ? 'ok' : e.success === false ? 'fail' : 'pending';
           const outcome = !e ? 'no episode' : e.success === true ? 'success' : e.success === false ? `failed (${e.failure_mode || '?'})` : 'not judged';
           const title = e ? `${modelName(m)} · ${a} agent · ${outcome} · ${e.n_steps} steps · ${fmtS(e.duration_s)} · ${fmtUsd(e.cost_usd)}` : `${a} agent: no episode`;
-          const seg = el('div', { class: `seg ${cls}`, title, role: e ? 'button' : null, tabindex: e ? '0' : null }, a[0].toUpperCase());
+          const seg = el('button', { type: 'button', class: `seg ${cls}`, title, 'aria-label': title, disabled: e ? null : '' }, a[0].toUpperCase());
           if (e) {
             seg.addEventListener('click', () => openEpisode(run.run_id, e.id));
-            seg.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEpisode(run.run_id, e.id); } });
           }
           segs.append(seg);
         }
@@ -342,9 +345,15 @@
     body.append(el('h3', { style: 'margin:10px 0 8px' }, `Trace (${(ep.steps || []).length} steps)`), steps);
   }
 
+  let drawerTrigger = null;
   function showDrawer(on) {
+    const wasOpen = !$('#drawer').classList.contains('hidden');
+    if (on && !wasOpen) drawerTrigger = document.activeElement;
     $('#drawer').classList.toggle('hidden', !on);
     $('#drawer-backdrop').classList.toggle('hidden', !on);
+    document.body.style.overflow = on ? 'hidden' : '';
+    if (on) $('#drawer-close').focus();
+    else if (wasOpen && drawerTrigger) drawerTrigger.focus();
   }
 
   // ---------------------------------------------------------------- versions & file viewer
@@ -367,7 +376,7 @@
           v.parent ? el('span', { class: 'parent' }, `← ${v.parent}`) : el('span', { class: 'parent' }, 'initial import'),
           r ? el('span', { class: `pill ${r.overall.success_rate >= 0.7 ? 'ok' : r.overall.success_rate >= 0.4 ? 'pending' : 'fail'}` }, `${fmtPct(r.overall.success_rate)} success`) : el('span', { class: 'pill pending' }, 'no runs yet'),
           el('span', { class: 'date' }, fmtDate(v.created_at))),
-        v.notes ? el('div', { class: 'notes' }, v.notes) : el('div', { class: 'notes empty' }, 'no optimizer notes for this version'),
+        v.notes ? el('details', { class: 'version-notes' }, el('summary', {}, 'Optimizer notes'), el('div', { class: 'notes' }, v.notes)) : null,
         (v.changed_files || []).length ? el('div', {}, el('span', { class: 'sub' }, `${v.changed_files.length} file${v.changed_files.length === 1 ? '' : 's'}: `), files) : null,
       ));
     }
@@ -464,8 +473,12 @@
     const siteIds = state.overview.sites.map(s => s.site_id);
     const wanted = state.siteId || new URLSearchParams(location.search).get('site');
     fillSelect(sel, siteIds.map(s => [s, s]), siteIds.includes(wanted) ? wanted : siteIds[0]);
+    $('#empty-state').classList.toggle('hidden', siteIds.length > 0);
+    document.querySelectorAll('#main > .card').forEach(card => card.classList.toggle('hidden', !siteIds.length));
+    $('.workspace-nav').classList.toggle('hidden', !siteIds.length);
+    sel.disabled = !siteIds.length;
     if (!siteIds.length) {
-      setStatus('no data: run scripts/seed_fake_data.py or a swarm', true);
+      setStatus('No experiments yet');
       state.site = null; renderTimeline(); renderVersions(); renderHeatmap(); renderBreakdown();
       return;
     }
@@ -487,7 +500,14 @@
   $('#live').addEventListener('change', e => setLive(e.target.checked));
   $('#drawer-close').addEventListener('click', () => showDrawer(false));
   $('#drawer-backdrop').addEventListener('click', () => showDrawer(false));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { showDrawer(false); const lb = $('.lightbox'); if (lb) lb.remove(); } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && !$('#drawer').classList.contains('hidden')) {
+      const items = [...$('#drawer').querySelectorAll('button, a[href], [tabindex="0"]')].filter(node => node.getClientRects().length);
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    if (e.key === 'Escape') { showDrawer(false); const lb = $('.lightbox'); if (lb) lb.remove(); } });
 
   load();
 })();

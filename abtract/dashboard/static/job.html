@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,15 +8,16 @@
 <link rel="stylesheet" href="/static/product.css">
 </head>
 <body class="product">
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
-  <a class="brand" href="/"><span class="logo">ab</span>tract</a>
-  <nav class="nav">
+  <a class="brand" href="/" aria-label="abtract home"><span class="brand-mark" aria-hidden="true">⌁</span> abtract</a>
+  <nav class="nav" aria-label="Main navigation">
     <a href="/">New run</a>
     <a id="nav-dashboard" href="/dashboard" class="btn">Dashboard</a>
   </nav>
 </header>
 
-<main class="jobpage">
+<main id="main" class="jobpage">
   <div class="job-head">
     <div class="crumbs"><a href="/">abtract</a> / jobs / <span id="crumb-id" class="mono"></span></div>
     <div class="job-title">
@@ -57,7 +58,7 @@
 </main>
 
 <footer class="foot">
-  <span>abtract · hackathon build</span>
+  <span>abtract / experiments</span>
   <span><a href="/api/docs">API</a> · <a href="/dashboard">Dashboard</a></span>
 </footer>
 

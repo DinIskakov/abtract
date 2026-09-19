@@ -74,7 +74,7 @@ def _job_file(job_id: str) -> Path:
 def test_landing_page(client: TestClient):
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
-    assert 'id="url"' in r.text and "Try with the demo site" in r.text and "let it fix itself" in r.text
+    assert 'id="url"' in r.text and "Try with the demo site" in r.text and "Evolve the" in r.text
     assert "/static/landing.js" in r.text
     assert 'id="budget"' not in r.text
     assert client.get("/static/landing.js").headers["content-type"].startswith("text/javascript")
