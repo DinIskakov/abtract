@@ -3,8 +3,8 @@
 The Modal entries are generated from the verified price table in `pricing.py` (one row per model with a Shared
 Endpoint price on modal.com/library). Adding a model = adding a row there. `gemini-flash` and `mock` are hand-written.
 
-Modal hosted inference is OpenAI-compatible. Each spec's `model` defaults to the library ID;
-`llm.resolve_modal_model` matches it against what GET /v1/models lists for your
+Modal hosted inference is OpenAI-compatible. Each spec's `model` defaults to the library ID (the same string as
+`modal endpoint create --model <ID>`); `llm.resolve_modal_model` matches it against what GET /v1/models lists for your
 proxy token (library ID or endpoint hostname) at first use. Set ABTRACT_MODEL_<ID> (id upper-cased, non-alphanumerics
 -> "_", e.g. ABTRACT_MODEL_DEEPSEEK_V4_1_FLASH) to force a name; `scripts/list_models.py` shows both.
 
