@@ -1,6 +1,7 @@
 """Generate frozen, reviewable documentation patch hypotheses after evaluation."""
 
 import json
+import re
 from datetime import UTC, datetime
 from typing import Self
 from uuid import uuid4
@@ -17,7 +18,7 @@ PROPOSER_VERSION = "uptrack-proposer-v1"
 
 class SourceDocument(BaseModel):
     url: HttpUrl
-    body: str = Field(min_length=1, max_length=100000)
+    body: str = Field(min_length=1, max_length=1_000_000)
 
 
 class ProposalRequest(BaseModel):
@@ -39,8 +40,10 @@ class ProposalRequest(BaseModel):
             self.documents
         ):
             raise ValueError("Source document URLs must be unique")
-        if sum(len(document.body) for document in self.documents) > 200000:
-            raise ValueError("Source documents exceed the 200000 character total limit")
+        if sum(len(document.body) for document in self.documents) > 2_000_000:
+            raise ValueError(
+                "Source documents exceed the 2000000 character total limit"
+            )
         return self
 
 
@@ -110,6 +113,23 @@ def observation_evidence(run: RunResult) -> dict[str, object]:
     }
 
 
+def document_evidence(document: SourceDocument) -> dict[str, object]:
+    # Keep exact editable markup, but omit scripts/styles from model context.
+    # Validation and hashing below still use the complete original response.
+    body = re.sub(
+        r"<(script|style|svg)\b[^>]*>.*?</\1\s*>",
+        "\n[omitted non-text markup]\n",
+        document.body,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    return {
+        "url": str(document.url),
+        "body": body[:60_000],
+        "excerpted": body != document.body or len(body) > 60_000,
+        "original_sha256": content_hash(document.body),
+    }
+
+
 async def propose(request: ProposalRequest) -> ProposalReport:
     failed = {
         f"{run.run_id}/{check.check_id}": check.model_dump()
@@ -155,7 +175,7 @@ async def propose(request: ProposalRequest) -> ProposalReport:
                     for run in request.runs
                 ],
                 "documents": [
-                    document.model_dump(mode="json") for document in request.documents
+                    document_evidence(document) for document in request.documents
                 ],
             },
             SuggestedChanges.model_json_schema(),

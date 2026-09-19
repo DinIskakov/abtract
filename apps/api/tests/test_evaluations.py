@@ -5,8 +5,8 @@ import pytest
 from pydantic import ValidationError
 
 from app import gemini
-from app.evaluations import EvaluationRequest, evaluate
-from app.proposals import ProposalRequest, propose
+from app.evaluations import EvaluationRequest, content_hash, evaluate
+from app.proposals import ProposalRequest, document_evidence, propose
 from app.runs import AgentReport, HarnessConfig, RunResult
 
 
@@ -427,3 +427,17 @@ def test_semantic_judges_overlap_with_limit_and_preserve_order(
         assert completion_order != list(range(6))
 
     asyncio.run(exercise())
+
+
+def test_proposal_context_omits_scripts_but_hashes_full_document() -> None:
+    document = (
+        proposal_request()
+        .documents[0]
+        .model_copy(
+            update={"body": "<script>private code</script><main>Visible help</main>"}
+        )
+    )
+    evidence = document_evidence(document)
+    assert "private code" not in evidence["body"]
+    assert "Visible help" in evidence["body"]
+    assert evidence["original_sha256"] == content_hash(document.body)

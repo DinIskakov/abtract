@@ -37,8 +37,9 @@ class RunRequest(BaseModel):
     harnesses: list[HarnessConfig] = Field(min_length=1, max_length=4)
     repetitions: int = Field(default=1, ge=1, le=5)
     timeout_seconds: int = Field(default=300, ge=10, le=900)
-    max_concurrency: int = Field(default=5, ge=1, le=10)
+    max_concurrency: int | None = Field(default=None, ge=1, le=20)
     capture_http: bool = False
+    retrieval_mode: Literal["native", "direct_http"] = "native"
     variant_id: str = Field(default="baseline", min_length=1, max_length=100)
     patches: list[VariantPatch] = Field(default_factory=list, max_length=20)
 
@@ -84,6 +85,7 @@ class RunResult(BaseModel):
     duration_seconds: float = 0
     execution_duration_seconds: float | None = None
     telemetry: Telemetry = Field(default_factory=Telemetry)
+    retrieval_mode: Literal["native", "direct_http"] = "native"
     variant_id: str = "baseline"
     variant_sha256: str = Field(default_factory=lambda: variant_hash([]))
     task_sha256: str = ""
@@ -181,6 +183,7 @@ async def run_one(
         repetition=repetition,
         harness=harness,
         harness_version=VERSIONS[harness.name],
+        retrieval_mode=request.retrieval_mode,
         variant_id=request.variant_id,
         variant_sha256=variant_hash(request.patches),
         task_sha256=sha256(request.tasks[task_index].encode()),
@@ -242,6 +245,14 @@ async def run_one(
             "Report only actions you actually took and sources you actually used. "
             "Describe any blockers in limitations. Do not grade your answer."
         )
+        if request.retrieval_mode == "direct_http":
+            prompt += (
+                "\nThis is a controlled single-page test. Use your native shell "
+                "to fetch the exact Platform URL with curl or an HTTP client. "
+                "Answer briefly using only that response; do not use hosted web "
+                "search, follow links, or change proxy settings. One sentence is "
+                "usually enough. If the page lacks the answer, say so."
+            )
         process = await sandbox.exec.aio(
             "runuser",
             "-u",

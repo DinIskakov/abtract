@@ -1,8 +1,18 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import evaluations, health, runs
+from app.experiments import shutdown_experiments
+from app.routers import evaluations, experiments, health, runs
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    yield
+    await shutdown_experiments()
 
 
 def create_app() -> FastAPI:
@@ -12,6 +22,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
 
     # CORS configuration
@@ -27,6 +38,7 @@ def create_app() -> FastAPI:
     application.include_router(health.router, prefix="/api")
     application.include_router(runs.router, prefix="/api")
     application.include_router(evaluations.router, prefix="/api")
+    application.include_router(experiments.router, prefix="/api")
 
     @application.get("/")
     async def root() -> dict[str, str]:

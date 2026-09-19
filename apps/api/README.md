@@ -3,8 +3,9 @@
 `POST /api/runs` accepts a URL, questions, harness configurations, and repetitions.
 It waits for the batch and returns one result per harness × task × repetition.
 Runs execute concurrently using Modal's `.aio` APIs and `asyncio.gather`, each in a
-fresh Modal Sandbox. A per-request semaphore defaults to five active runs. There is no
-database or background queue. Evaluation and proposal endpoints operate outside
+fresh Modal Sandbox. By default the entire request matrix runs concurrently (up to 20 runs per batch).
+An explicit `max_concurrency` can lower concurrency. There is no database or external
+background queue. Evaluation and proposal endpoints operate outside
 the sandboxes; harnesses retain their native tools.
 
 ## Setup
@@ -45,8 +46,8 @@ See [Modal service users](https://modal.com/docs/guide/service-users).
 
 The current endpoint is a development MVP, not a production deployment: it still
 needs API authentication, global admission/concurrency limits, and shared durable storage
-before exposing it publicly. Long batches also need background execution rather
-than relying on a single HTTP request staying open.
+before exposing it publicly. The experiment endpoint runs in a background asyncio task; use a single API worker.
+Restarted or interrupted jobs are marked failed, not silently resumed.
 
 ## Request
 
@@ -69,7 +70,7 @@ use the Codex/Claude CLI default or configured `GEMINI_MODEL`. `name` accepts
 may take longer while Modal builds the images. Subsequent runs reuse images but
 never reuse a task's sandbox. Native unattended execution permissions are enabled
 inside the isolated sandbox, with no MCP servers, plugins, or custom tools added.
-`max_concurrency` (1–10, default 5) limits in-flight runs within a batch, including
+`max_concurrency` (1–20, omitted by default) limits in-flight runs within a batch, including
 creation, execution, retrieval, and cleanup. Returned results retain input order;
 a failed run does not cancel its siblings. Different requests have separate limits.
 The Claude launch uses a PTY as in Modal's official agent example. Codex uses
@@ -280,3 +281,43 @@ References: [Modal Sandboxes](https://modal.com/docs/guide/sandboxes),
 [Modal filesystem API](https://modal.com/docs/guide/sandbox-files),
 [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive),
 [Claude Code headless mode](https://code.claude.com/docs/en/headless).
+
+## Automatic workbench workflow
+
+The Next.js frontend uses these endpoints:
+
+- `GET /api/experiments/options`: configured supervisor and available native harnesses.
+- `POST /api/experiments`: starts a job and returns `202` with an experiment ID.
+- `GET /api/experiments/{id}`: polls persisted phases and compact results.
+
+```json
+{
+  "url": "https://example.com",
+  "harnesses": [
+    {"name": "codex", "model": "gpt-5.4-mini"},
+    {"name": "gemini", "model": "gemini-3.8-flash"}
+  ],
+  "task_count": 3
+}
+```
+
+Gemini is always the supervisor, independently of which harnesses are selected.
+It reads one public page, creates 1–3 easy factual questions and fixed reference
+answers, evaluates baseline responses, and proposes source-grounded patches for
+observed failures. Each arm runs every task/model combination simultaneously in
+fresh Modal sandboxes. Modal workspace quotas and image startup can still delay
+actual execution. Native shell HTTP retrieval is requested (`retrieval_mode:
+"direct_http"`), so this is a controlled single-page comparison. The standalone
+`/api/runs` endpoint defaults to unrestricted native retrieval.
+
+The baseline report appears before proposals. Patches are frozen before B and
+reuse the same questions, graders, and models. No B is created if no patch is
+justified or the captured baseline source differs from the fetched page. Missing
+patch exposure is reported as unverified. A single repetition is descriptive,
+not evidence of statistical significance.
+
+Artifacts live under ignored `docs/artifacts/experiments`; full native run records
+remain available at `GET /api/runs/{run_id}`. Polling excludes raw traces and HTTP
+bodies. Page fetching validates public addresses and redirects, pins DNS, limits
+responses to 1 MB, and supports HTML/plain-text pages without authentication.
+Dynamic app login and multi-page crawling are outside this small demo.
