@@ -34,6 +34,7 @@ Modal:      registered on the shared app as `dashboard` (label "dashboard").
 from __future__ import annotations
 
 import base64
+import asyncio
 import hmac
 import math
 import mimetypes
@@ -42,6 +43,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
+import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -332,6 +334,25 @@ def _fresh() -> None:
     store.reload()
 
 
+class VolumeAccessMiddleware:
+    """A reload temporarily unmounts the Volume in this web container.
+
+    Keep it exclusive with all dashboard reads/writes, through the end of file
+    responses. Other containers can still run swarm attempts in parallel.
+    """
+    def __init__(self, app):
+        self.app = app
+        self.lock = asyncio.Lock()
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope["type"] == "http" and path.startswith(("/api/", "/jobs/", "/screenshots/")):
+            async with self.lock:
+                await self.app(scope, receive, send)
+        else:
+            await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     import modal
 
@@ -339,6 +360,7 @@ def create_app() -> FastAPI:
     if not modal.is_local() and not password:
         raise RuntimeError("Set ABTRACT_DASHBOARD_PASSWORD in abtract-secrets before hosting the product")
     app = FastAPI(title="abtract dashboard", docs_url="/api/docs", redoc_url=None)
+    app.add_middleware(VolumeAccessMiddleware)
     if password:
         @app.middleware("http")
         async def authenticate(request: Request, call_next):
@@ -473,6 +495,21 @@ def create_app() -> FastAPI:
     @api.get("/jobs/{job_id}")
     def get_job(job_id: str) -> dict[str, Any]:
         return _job_full(_load_job(job_id))
+
+    @api.get("/jobs/{job_id}/first-look")
+    def first_look(job_id: str):
+        job = _load_job(job_id)
+        if job.type != "intake" or not job.url or job.status not in {"queued", "running"}:
+            return None
+        if job.live_preview and job.live_preview.page:
+            return job.live_preview
+        from abtract.optimizer.preview import fetch_first_look
+        try:
+            return fetch_first_look(job.url)
+        except (httpx.HTTPError, ValueError):
+            # The worker can continue with its normal crawl; a slow preview must
+            # neither fail the job nor replace its saved state.
+            return None
 
     # ---- runs & episodes
 

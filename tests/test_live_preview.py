@@ -1,13 +1,16 @@
 """Progress must contain useful evidence before the complete run/report is available."""
 import time
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from abtract import jobs, store
 from abtract.config import settings
 from abtract.dashboard.app import create_app
+from abtract.optimizer import preview as previews
 from abtract.optimizer.preview import attempt, inspect_page, summarize_page, update_attempts
-from abtract.schemas import Episode, Job, JobPreview, RunSummary, Task
+from abtract.schemas import Episode, Job, JobPreview, PageSummary, RunSummary, Task
 from tests.test_jobs import TASKS, _fake_mirror_to_store, make_fake_run_swarm
 
 
@@ -16,6 +19,45 @@ def test_homepage_summary_is_useful_even_without_obstacles():
     page = summarize_page(html)
     assert (page.title, page.heading, page.links, page.forms) == ("Example", "Build things", 1, 1)
     assert not inspect_page("index.html", html)
+
+
+def test_first_look_is_available_before_the_worker_starts(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    monkeypatch.setattr(settings, "dashboard_password", "")
+    job = Job(type="intake", url="https://example.com", scan_mode="quick")
+    store.save_job(job)
+    original = store.load_job(job.id).model_dump()
+    monkeypatch.setattr(previews, "fetch_first_look", lambda url: JobPreview(page=PageSummary(title="Homepage"), pages_scanned=1))
+    with TestClient(create_app()) as client:
+        r = client.get(f"/api/jobs/{job.id}/first-look")
+        assert r.status_code == 200 and r.json()["page"]["title"] == "Homepage"
+    assert store.load_job(job.id).model_dump() == original
+
+
+def test_first_look_failure_does_not_fail_the_job(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    monkeypatch.setattr(settings, "dashboard_password", "")
+    job = Job(type="intake", url="https://example.com")
+    store.save_job(job)
+    def timeout(url):
+        raise httpx.ReadTimeout("slow origin")
+    monkeypatch.setattr(previews, "fetch_first_look", timeout)
+    with TestClient(create_app()) as client:
+        assert client.get(f"/api/jobs/{job.id}/first-look").json() is None
+    assert store.load_job(job.id).status == "queued"
+
+
+@pytest.mark.parametrize("body,available", [(b'<title>Example</title><canvas></canvas>', True), (b'x' * 2_000_001, False)])
+def test_first_look_reads_only_bounded_html(monkeypatch, body, available):
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, headers={"content-type": "text/html"}, content=body))
+    with httpx.Client(transport=transport) as client:
+        monkeypatch.setattr(previews.httpx, "stream", lambda *a, **kw: client.stream("GET", "https://example.com"))
+        if available:
+            result = previews.fetch_first_look("https://example.com")
+            assert result.page.title == "Example" and result.observations
+        else:
+            with pytest.raises(ValueError, match="limit"):
+                previews.fetch_first_look("https://example.com")
 
 
 def test_initial_checks_use_html_evidence_and_respect_labels():

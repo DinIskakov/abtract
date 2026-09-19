@@ -280,13 +280,19 @@
     const box = $('#live-preview');
     box.classList.toggle('hidden', job.status === 'done');
     if (job.status === 'done') return;
-    const p = job.live_preview;
+    let p = job.live_preview;
+    if (state.firstLook && !p?.page) {
+      p = { ...state.firstLook, ...p, page: state.firstLook.page,
+        pages_scanned: Math.max(p?.pages_scanned || 0, state.firstLook.pages_scanned),
+        observations: p?.observations?.length ? p.observations : state.firstLook.observations };
+    }
     const key = JSON.stringify([job.status, job.phase, p, state.meta.models]);
     if (state.previewKey === key) return;
     state.previewKey = key;
     box.replaceChildren(el('div', { class: 'card-head' }, el('h2', {}, 'Initial findings'),
       el('span', { class: 'pill pending' }, job.status === 'failed' ? 'Partial results' : 'Live · preliminary')));
     const status = job.status === 'failed' ? 'The run stopped. These are the results collected before it stopped.' :
+      job.status === 'queued' && p?.page ? 'Here’s a first look at your homepage. Your scan is starting.' :
       p?.completed ? 'Your first results are ready. Findings update below as the remaining attempts finish.' :
       p?.total ? 'Agents are working through your tasks. The first completed attempt will appear here automatically.' :
       p?.pages_scanned ? 'We’re checking the fetched pages and preparing tasks for the agents.' :
@@ -554,6 +560,15 @@
   }
 
   // ---------------------------------------------------------------- polling
+  function requestFirstLook(job) {
+    if (state.firstLookRequested || job.type !== 'intake' || job.live_preview?.page || !['queued', 'running'].includes(job.status)) return;
+    state.firstLookRequested = true;
+    api(`/api/jobs/${encodeURIComponent(jobId)}/first-look`).then(preview => {
+      state.firstLook = preview;
+      if (state.job) renderLivePreview(state.job);
+    }).catch(() => { /* the background crawl still supplies page observations */ });
+  }
+
   function render(job) {
     renderHead(job);
     renderStepper(job);
@@ -561,6 +576,7 @@
     renderRunsSoFar(job);
     renderCta(job);
     renderLivePreview(job);
+    requestFirstLook(job);
     if (job.status === 'done') renderReport(job);
     else $('#report').classList.add('hidden');
   }

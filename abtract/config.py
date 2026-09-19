@@ -23,6 +23,7 @@ class Settings:
     gemini_model: str = _env("GEMINI_MODEL", "gemini-3.8-flash")
     dashboard_password: str = _env("ABTRACT_DASHBOARD_PASSWORD")
     job_swarm_budget_usd: float = float(_env("ABTRACT_JOB_SWARM_BUDGET_USD", "5"))
+    job_swarm_concurrency: int = int(_env("ABTRACT_JOB_SWARM_CONCURRENCY", "16"))
 
     # Storage. On Modal the Volume is mounted at /data (see abtract/modal_app.py).
     data_dir: Path = Path(_env("ABTRACT_DATA_DIR", "/data" if os.path.exists("/data") else "./data"))

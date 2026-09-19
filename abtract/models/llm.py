@@ -70,6 +70,12 @@ def chat(
         except LLMError:
             raise
         except Exception as e:  # noqa: BLE001  transient: rate limit, network, 5xx
+            status = getattr(e, "status_code", None) or getattr(e, "code", None)
+            if status in (401, 403):
+                if spec.provider == "gemini":
+                    raise LLMError(f"Google rejected the Gemini credential (HTTP {status}). Check the key and project permissions "
+                                   "in Google AI Studio, update GEMINI_API_KEY in abtract-secrets, and redeploy before retrying Optimize.") from e
+                raise LLMError(f"{spec.id}: provider rejected the credential (HTTP {status}); check its endpoint token and permissions") from e
             last_err = e
             if attempt + 1 < retries:
                 time.sleep(min(2**attempt, 8))

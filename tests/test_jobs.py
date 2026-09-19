@@ -144,6 +144,15 @@ def test_intake_defaults_to_default_swarm_and_all_agents(faked, monkeypatch):
     assert store.load_job(job.id).progress_total == 3 * len(TASKS)
 
 
+@pytest.mark.parametrize("configured,expected", [(16, 16), (100, 40), (0, 1)])
+def test_product_concurrency_is_configurable_and_bounded(faked, monkeypatch, configured, expected):
+    monkeypatch.setattr(settings, "job_swarm_concurrency", configured)
+    job = Job(type="intake", url="https://example.com", model_ids=["mock"], agent_kinds=["text"])
+    store.save_job(job)
+    assert jobs.run_job_sync(job.id).status == "done"
+    assert faked["swarm"][0]["kw"]["concurrency"] == expected
+
+
 def test_progress_is_written_during_the_swarm(faked, monkeypatch):
     seen: list[int] = []
     real_save = store.save_job

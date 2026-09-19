@@ -24,6 +24,7 @@ from typing import Any
 import modal
 
 from abtract import store
+from abtract.config import settings
 from abtract.hosting import urls
 from abtract.intake.mirror import mirror_to_store
 from abtract.intake.tasks import pick_quick_tasks, pick_tasks
@@ -121,7 +122,7 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
                   log_line=f"{counter['n']}/{total} {status} {ep.model_id} {kind} {ep.task_id} "
                            f"steps={ep.n_steps} {ep.duration_s:.0f}s ${ep.cost_usd:.4f}")
 
-    kwargs: dict[str, Any] = {}
+    kwargs: dict[str, Any] = {"concurrency": max(1, min(40, settings.job_swarm_concurrency))}
     if job.budget_usd is not None:
         kwargs["budget_usd"] = max(0.0, job.budget_usd - job.swarm_spent_usd)
     if job.scan_mode == "quick":

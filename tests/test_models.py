@@ -203,6 +203,19 @@ def test_chat_sends_the_resolved_name(monkeypatch, fresh_resolution):
     assert r.text == "hi" and r.usage.input_tokens == 7 and r.usage.llm_calls == 1
 
 
+def test_gemini_auth_failure_is_actionable_and_not_retried(monkeypatch):
+    calls = []
+    class Rejected(Exception):
+        code = 401
+    def reject(*a, **kw):
+        calls.append(1)
+        raise Rejected("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+    monkeypatch.setattr(llm, "_chat_gemini", reject)
+    with pytest.raises(llm.LLMError, match="Google AI Studio.*GEMINI_API_KEY.*abtract-secrets"):
+        llm.chat(get_model("gemini-flash"), [ChatMessage(role="user", content="hello")])
+    assert calls == [1]
+
+
 def test_per_model_endpoint_url_falls_back_to_gateway(monkeypatch):
     monkeypatch.setattr(settings, "modal_inference_base_url", "https://gateway.example/v1/")
     monkeypatch.setenv("ABTRACT_BASE_URL_DEEPSEEK_V4_1_FLASH", " https://deepseek.example/v1/ ")

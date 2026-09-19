@@ -1,7 +1,9 @@
 """Fast provisional findings from fetched HTML and completed attempts, without model calls."""
 from collections import Counter
+import time
 
 from bs4 import BeautifulSoup
+import httpx
 
 from abtract.schemas import Episode, JobPreview, PageSummary, PreviewAttempt, Task
 
@@ -13,6 +15,29 @@ def summarize_page(html: bytes) -> PageSummary:
     return PageSummary(title=soup.title.get_text(" ", strip=True)[:200] if soup.title else "",
                        heading=heading.get_text(" ", strip=True)[:240] if heading else "",
                        links=len(soup.find_all("a", href=True)), forms=len(soup.find_all("form")))
+
+
+def fetch_first_look(url: str) -> JobPreview:
+    """One bounded homepage read on the web server, independent of worker startup.
+
+    No scripts, assets, or inference. This is kept separate from the worker's job
+    writes so a preview cannot overwrite newer progress or completion results.
+    """
+    deadline = time.monotonic() + 5
+    chunks, size = [], 0
+    with httpx.stream("GET", url, follow_redirects=True, timeout=5,
+                      headers={"User-Agent": "abtract-first-look/0.1"}) as response:
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "").lower()
+        if content_type and "html" not in content_type:
+            raise ValueError("homepage did not return HTML")
+        for chunk in response.iter_bytes():
+            size += len(chunk)
+            if size > 2_000_000 or time.monotonic() > deadline:
+                raise ValueError("homepage exceeded the first-look size or time limit")
+            chunks.append(chunk)
+    html = b"".join(chunks)
+    return JobPreview(page=summarize_page(html), pages_scanned=1, observations=inspect_page("Homepage", html))
 
 
 def inspect_page(path: str, html: bytes) -> list[str]:

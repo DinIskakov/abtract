@@ -26,7 +26,7 @@
 
     <form id="intake" class="url-form" autocomplete="off" novalidate>
       <input id="url" name="url" class="url" type="text" inputmode="url" placeholder="https://your-site.com" spellcheck="false" autofocus aria-label="Website URL">
-      <button type="submit" id="go" class="btn primary lg">Run quick scan</button>
+      <button type="submit" id="go" class="btn primary lg">Run full audit</button>
     </form>
     <div class="hero-actions">
       <button type="button" id="demo" class="btn ghost">Try with the demo site</button>
@@ -36,10 +36,10 @@
     <div class="scan-choice">
       <label for="scan-mode">Start with</label>
       <select id="scan-mode">
-        <option value="quick" selected>Quick scan</option>
-        <option value="full">Full audit</option>
+        <option value="full" selected>Full audit</option>
+        <option value="quick">Quick scan</option>
       </select>
-      <span class="sub" id="scan-description">3 short tasks · 1 model · text and browser checks. Expand to a full audit from your results.</span>
+      <span class="sub" id="scan-description">Parallel agents, with findings appearing as they finish.</span>
     </div>
 
     <details class="options" id="options">
@@ -64,13 +64,13 @@
       <div class="how-step">
         <span class="num">1</span>
         <h3>Mirror</h3>
-        <p>We fetch a snapshot of your site and show what agents can read. Quick scans start with short, checkable tasks.</p>
+        <p>Get a first look at what agents can read while we prepare a snapshot of your site for testing.</p>
         <span class="arrow">→</span>
       </div>
       <div class="how-step">
         <span class="num">2</span>
         <h3>Swarm</h3>
-        <p>See results as agents finish each task. Start with a small quick scan, then expand to a full audit across models and text, DOM and vision agents.</p>
+        <p>Text, DOM and vision agents test your site in parallel. Findings appear as each attempt finishes. Choose the optional quick scan for a smaller sample.</p>
         <span class="arrow">→</span>
       </div>
       <div class="how-step">
