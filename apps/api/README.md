@@ -297,14 +297,17 @@ The Next.js frontend uses these endpoints:
     {"name": "codex", "model": "gpt-5.4-mini"},
     {"name": "gemini", "model": "gemini-3.8-flash"}
   ],
-  "task_count": 3
+  "task_count": 3,
+  "difficulty": "hard",
+  "latency_budget_seconds": 15
 }
 ```
 
 Gemini is always the supervisor, independently of which harnesses are selected.
-It reads one public page, creates 1–3 easy factual questions and fixed reference
+It reads one public page, creates 1–3 questions at the selected difficulty with fixed reference
 answers, evaluates baseline responses, and proposes source-grounded patches for
-observed failures. Each arm runs every task/model combination simultaneously in
+incorrect answers or missed performance targets. Easy asks direct facts, medium
+connects documented details, and hard asks for supported reasoning or concise code. Each arm runs every task/model combination simultaneously in
 fresh Modal sandboxes. Modal workspace quotas and image startup can still delay
 actual execution. Native shell HTTP retrieval is requested (`retrieval_mode:
 "direct_http"`), so this is a controlled single-page comparison. The standalone
@@ -321,3 +324,21 @@ remain available at `GET /api/runs/{run_id}`. Polling excludes raw traces and HT
 bodies. Page fetching validates public addresses and redirects, pins DNS, limits
 responses to 1 MB, and supports HTML/plain-text pages without authentication.
 Dynamic app login and multi-page crawling are outside this small demo.
+
+### Latency optimization
+
+`latency_budget_seconds` defaults to 15 (positive, at most 180). It is an editable
+product target, not a universal benchmark or a timeout. Every generated rubric
+adds `execution_duration_budget`, measured from `execution_duration_seconds`.
+This excludes sandbox startup and cleanup; it includes agent tool work, provider
+waiting, and network latency. It is not time to first token. The older
+`duration_budget` criterion still measures total run wall time. Missing execution
+telemetry produces `unknown`, never a fallback to wall time.
+
+Correct but slow answers can trigger Gemini proposals. Gemini receives execution
+and total times, tokens, tool counts, costs, and request traces, and must identify
+a plausible source change while preserving facts. A latency miss alone does not
+prove a page problem, so Gemini can still return no patch. A and B share identical
+questions and targets. Reports separate correctness from performance failures and
+show paired runtime differences; faster incorrect or unverified-exposure answers
+are not labeled improvements. Single-run differences remain exploratory.

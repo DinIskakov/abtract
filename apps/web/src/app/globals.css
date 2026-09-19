@@ -1762,3 +1762,58 @@ h4 {
     transform: none;
   }
 }
+
+.test-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  padding-top: 23px;
+}
+.test-settings select,
+.test-settings input {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 9px 10px;
+  margin-top: 9px;
+  font-size: 11px;
+  width: 100%;
+  min-width: 0;
+}
+.experiment-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 15px;
+}
+.experiment-settings > span:first-child {
+  text-transform: capitalize;
+}
+.latency-note {
+  font-size: 9px;
+  color: #976f28;
+  margin-top: 3px;
+}
+.comparison-row .time-change {
+  color: var(--ink);
+  font-family: var(--font-mono), monospace;
+  font-size: 8px;
+}
+@media (max-width: 700px) {
+  .test-settings {
+    grid-template-columns: 1fr;
+    gap: 17px;
+  }
+  .test-settings select,
+  .test-settings input {
+    font-size: 10px;
+  }
+  .experiment-settings {
+    font-size: 8px;
+    gap: 5px 12px;
+  }
+  .comparison-row .time-change {
+    font-size: 7px;
+  }
+}

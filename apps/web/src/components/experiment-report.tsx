@@ -4,6 +4,11 @@ import type {
   RunResult,
   Outcome,
 } from "@/lib/types";
+import {
+  answerOutcome,
+  overTimeTarget,
+  compareAgentTime,
+} from "@/lib/report-metrics";
 import { Arrow } from "./lab-visuals";
 
 function seconds(value: number | null | undefined) {
@@ -44,10 +49,11 @@ function RunDetails({
   run: RunResult;
   evaluation?: EvaluationReport["runs"][number];
 }) {
+  const correctness = answerOutcome(evaluation);
   return (
     <details className="run-card">
       <summary>
-        <span className={`result-dot ${evaluation?.outcome ?? "pending"}`} />
+        <span className={`result-dot ${correctness ?? "pending"}`} />
         <span className="run-title">
           <strong>{run.task.split("\n")[0]}</strong>
           <span>
@@ -57,14 +63,23 @@ function RunDetails({
           </span>
         </span>
         <span className="run-time">
-          {seconds(run.execution_duration_seconds ?? run.duration_seconds)}
+          {seconds(run.execution_duration_seconds)}
         </span>
-        <span className={`outcome ${evaluation?.outcome ?? "pending"}`}>
-          {outcomeLabel(evaluation?.outcome)}
+        <span className={`outcome ${correctness ?? "pending"}`}>
+          {correctness === "pass" ? "Correct" : outcomeLabel(correctness)}
         </span>
         <span className="expand-sign">+</span>
       </summary>
       <div className="run-detail-body">
+        {overTimeTarget(evaluation) ? (
+          <p className="latency-note">
+            Answer checks:{" "}
+            {correctness === "pass"
+              ? "passed"
+              : outcomeLabel(correctness).toLowerCase()}
+            . Agent time exceeded the target.
+          </p>
+        ) : null}
         {run.error ? <p className="error-message">{run.error}</p> : null}
         {evaluation ? (
           <div className="checks">
@@ -93,6 +108,13 @@ function RunDetails({
           <p className="muted">Evaluation is in progress.</p>
         )}
         <div className="run-metrics">
+          <span>
+            Agent time{" "}
+            <strong>{seconds(run.execution_duration_seconds)}</strong>
+          </span>
+          <span>
+            Total run time <strong>{seconds(run.duration_seconds)}</strong>
+          </span>
           <span>
             Tool calls <strong>{run.telemetry.tool_calls ?? "—"}</strong>
           </span>
@@ -175,33 +197,42 @@ export function Report({
     costs.length && costs.every((cost) => cost != null)
       ? costs.reduce<number>((sum, cost) => sum + (cost ?? 0), 0)
       : null;
-  const averageTime = runs.length
-    ? runs.reduce(
-        (sum, run) =>
-          sum + (run.execution_duration_seconds ?? run.duration_seconds),
-        0,
-      ) / runs.length
-    : null;
+  const timedRuns = runs.filter(
+    (run) => run.execution_duration_seconds != null,
+  );
+  const averageTime =
+    timedRuns.length === runs.length && runs.length
+      ? timedRuns.reduce(
+          (sum, run) => sum + run.execution_duration_seconds!,
+          0,
+        ) / timedRuns.length
+      : null;
+  const correct =
+    evaluation?.runs.filter((run) => answerOutcome(run) === "pass").length ?? 0;
+  const incorrect =
+    evaluation?.runs.filter((run) => answerOutcome(run) === "fail").length ?? 0;
+  const uncertain =
+    evaluation?.runs.filter((run) => answerOutcome(run) === "unknown").length ??
+    0;
+  const overTarget = evaluation?.runs.filter(overTimeTarget).length ?? 0;
   return (
     <div className="report">
       <div className="metric-grid">
         <div>
-          <span className="micro-label">TASKS PASSED</span>
+          <span className="micro-label">ANSWER CHECKS PASSED</span>
           <strong>
-            {evaluation
-              ? `${evaluation.passed}/${evaluation.runs.length}`
-              : "—"}
+            {evaluation ? `${correct}/${evaluation.runs.length}` : "—"}
           </strong>
           <span>
             {evaluation
-              ? `${evaluation.failed} failed · ${evaluation.unknown} uncertain`
+              ? `${incorrect} incorrect · ${uncertain} uncertain`
               : "Waiting for evaluation"}
           </span>
         </div>
         <div>
           <span className="micro-label">AVG. AGENT TIME</span>
           <strong>{seconds(averageTime)}</strong>
-          <span>Per isolated run</span>
+          <span>{overTarget} over target · startup excluded</span>
         </div>
         <div>
           <span className="micro-label">MODEL COST EST.</span>
@@ -265,39 +296,50 @@ export function Comparison({ experiment }: { experiment: Experiment }) {
         const afterEval = experiment.variant_evaluation?.runs.find(
           (item) => item.run_id === after?.run_id,
         );
+        const timing = compareAgentTime(
+          run.execution_duration_seconds,
+          after?.execution_duration_seconds,
+          beforeEval,
+          afterEval,
+        );
+        const signed = (value: number) =>
+          `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
         return (
           <div className="comparison-row" key={run.run_id}>
             <span>
               <strong>{friendlyName(run.harness.name)}</strong>Task{" "}
               {run.task_index + 1}
-              {afterEval && !afterEval.variant_attribution_eligible ? (
-                <small>Exposure unverified</small>
+              <small>{timing.label}</small>
+            </span>
+            <span>
+              <span className={`outcome ${answerOutcome(beforeEval)}`}>
+                {answerOutcome(beforeEval) === "pass"
+                  ? "Correct"
+                  : outcomeLabel(answerOutcome(beforeEval))}
+              </span>
+              <small>{seconds(run.execution_duration_seconds)}</small>
+            </span>
+            <span>
+              <span className={`outcome ${answerOutcome(afterEval)}`}>
+                {answerOutcome(afterEval) === "pass"
+                  ? "Correct"
+                  : outcomeLabel(answerOutcome(afterEval))}
+              </span>
+              <small>{seconds(after?.execution_duration_seconds)}</small>
+              {timing.delta != null ? (
+                <small className="time-change">
+                  {signed(timing.delta)}s
+                  {timing.percent != null
+                    ? ` (${signed(timing.percent)}%)`
+                    : ""}
+                </small>
               ) : null}
-            </span>
-            <span>
-              <span className={`outcome ${beforeEval?.outcome}`}>
-                {outcomeLabel(beforeEval?.outcome)}
-              </span>
-              <small>
-                {seconds(
-                  run.execution_duration_seconds ?? run.duration_seconds,
-                )}
-              </small>
-            </span>
-            <span>
-              <span className={`outcome ${afterEval?.outcome}`}>
-                {outcomeLabel(afterEval?.outcome)}
-              </span>
-              <small>
-                {seconds(
-                  after?.execution_duration_seconds ?? after?.duration_seconds,
-                )}
-              </small>
             </span>
           </div>
         );
       })}
       <p className="fine-print">
+        Time changes compare agent execution only, excluding sandbox startup.
         One run per task is an initial signal. Repeat with unseen tasks before
         claiming an improvement.
       </p>

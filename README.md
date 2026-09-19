@@ -1,6 +1,6 @@
 # UpTrack / Abtract Monorepo
 
-An agent usability experiment workbench with a **Next.js** frontend and **FastAPI** backend. Paste a public page URL, select native agent harnesses, and Gemini creates simple tasks, evaluates parallel Modal runs, and proposes patches for a second evaluation.
+An agent usability experiment workbench with a **Next.js** frontend and **FastAPI** backend. Paste a public page URL, select native agent harnesses, and Gemini creates tasks at your chosen difficulty, evaluates parallel Modal runs, and proposes correctness or latency patches for a second evaluation.
 
 See [workbench setup](apps/web/README.md) and [backend workflow](apps/api/README.md#automatic-workbench-workflow). This is a local, single-worker MVP.
 

@@ -250,8 +250,9 @@ async def run_one(
                 "\nThis is a controlled single-page test. Use your native shell "
                 "to fetch the exact Platform URL with curl or an HTTP client. "
                 "Answer briefly using only that response; do not use hosted web "
-                "search, follow links, or change proxy settings. One sentence is "
-                "usually enough. If the page lacks the answer, say so."
+                "search, follow links, or change proxy settings. Keep the answer "
+                "concise but complete; include reasoning or code when the task "
+                "requests it. If the page lacks the answer, say so."
             )
         process = await sandbox.exec.aio(
             "runuser",

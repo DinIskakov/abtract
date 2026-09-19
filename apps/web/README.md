@@ -1,8 +1,10 @@
 # UpTrack workbench
 
-A Next.js frontend for URL → simple Gemini tasks → baseline report → proposed
+A Next.js frontend for URL → Gemini tasks → baseline report → proposed
 patches → variant report. Gemini always supervises; Codex and Gemini CLI can be
-selected independently as tested harnesses. Unconfigured harnesses stay visible
+selected independently as tested harnesses. Choose Easy, Medium, or Hard tasks
+and an agent-time target (15 seconds by default). Correct but slow answers can
+trigger efficiency patches as well as correctness fixes. Unconfigured harnesses stay visible
 and disabled with an explanation.
 
 From the repository root, install with `bun install`. Start FastAPI on port8000
@@ -11,7 +13,8 @@ http://localhost:3000. `BACKEND_URL` changes the Next.js API proxy target.
 Provider keys stay in the backend environment, never in browser code.
 
 The interface uses a moving technical grid, phase-based transitions, expanded
-per-task evidence, source patch comparisons, and saved experiment restoration.
+per-task correctness and time-target evidence, source patch comparisons,
+paired agent-runtime differences, and saved experiment restoration.
 Reduced-motion preferences disable animation. The browser polls short endpoints;
 closing the tab does not stop the experiment.
 

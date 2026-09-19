@@ -141,7 +141,11 @@ export interface ProposalReport {
   interpretation: string;
 }
 
+export type Difficulty = "easy" | "medium" | "hard";
+
 export interface Experiment {
+  difficulty?: Difficulty;
+  latency_budget_seconds?: number;
   experiment_id: string;
   url: string;
   phase: Phase;
@@ -160,6 +164,8 @@ export interface Experiment {
 }
 
 export interface ExperimentRequest {
+  difficulty: Difficulty;
+  latency_budget_seconds: number;
   url: string;
   harnesses: HarnessConfig[];
   task_count: number;

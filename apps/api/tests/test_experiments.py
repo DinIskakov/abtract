@@ -48,6 +48,8 @@ def result(request, harness):
         harness_version="test",
         status="completed",
         variant_id=request.variant_id,
+        duration_seconds=100,
+        execution_duration_seconds=20 if request.variant_id == "baseline" else 5,
         report=AgentReport(
             answer="widgets", actions=[], sources=[str(PAGE.url)], limitations=[]
         ),
@@ -73,11 +75,11 @@ def test_pipeline_order_identical_questions_and_full_parallelism(
 ):
     monkeypatch.setattr(settings, "artifact_dir", tmp_path)
     monkeypatch.setattr(experiments, "fetch_page", AsyncMock(return_value=PAGE))
-    monkeypatch.setattr(
-        experiments, "generate_tasks", AsyncMock(return_value=[rubric()])
-    )
+    generator = AsyncMock(return_value=[rubric()])
+    monkeypatch.setattr(experiments, "generate_tasks", generator)
     stages = []
     requests = []
+    graded_rubrics = []
     original_persist = experiments.persist
 
     async def persist(experiment, phase):
@@ -90,9 +92,16 @@ def test_pipeline_order_identical_questions_and_full_parallelism(
 
     async def grade(request):
         assert request.semantic_judge is True
+        graded_rubrics.append(request.rubrics)
         return await evaluate(request.model_copy(update={"semantic_judge": False}))
 
     async def propose(request):
+        # Correct answers still expose a real, independently measured latency failure.
+        assert request.evaluation.failed == 2
+        for run in request.evaluation.runs:
+            checks = {check.check_id: check for check in run.checks}
+            assert checks["answer"].outcome == "pass"
+            assert checks["agent_latency"].outcome == "fail"
         patch = VariantPatch(
             patch_id="patch-1",
             url=PAGE.url,
@@ -103,7 +112,11 @@ def test_pipeline_order_identical_questions_and_full_parallelism(
         patches = (
             [
                 ProposedPatch(
-                    patch=patch, rationale="Clarify wording", failed_check_refs=["test"]
+                    patch=patch,
+                    rationale="Clarify wording",
+                    failed_check_refs=[
+                        f"{request.evaluation.runs[0].run_id}/agent_latency"
+                    ],
                 )
             ]
             if with_patch
@@ -128,12 +141,18 @@ def test_pipeline_order_identical_questions_and_full_parallelism(
                 url=PAGE.url,
                 harnesses=[HarnessConfig(name="codex"), HarnessConfig(name="gemini")],
                 task_count=1,
+                difficulty="medium",
+                latency_budget_seconds=10,
             )
         )
         assert started.phase == "planning"
         await experiments.jobs[started.experiment_id]
         final = await experiments.read_experiment(started.experiment_id)
         assert final.phase == "completed"
+        assert final.difficulty == "medium"
+        assert final.latency_budget_seconds == 10
+        generator.assert_awaited_once_with(PAGE, 1, "medium")
+        assert final.tasks[0].criteria[-1].limit == 10
         assert final.concurrency == requests[0].max_concurrency == 2
         assert requests[0].capture_http is True
         assert requests[0].retrieval_mode == "direct_http"
@@ -150,6 +169,8 @@ def test_pipeline_order_identical_questions_and_full_parallelism(
             assert requests[0].harnesses == requests[1].harnesses
             assert requests[1].max_concurrency == 2
             assert final.variant_evaluation is not None
+            assert final.variant_evaluation.passed == 2
+            assert graded_rubrics[0] == graded_rubrics[1]
         else:
             assert final.variant_runs == []
         public = experiments.public_experiment(final)
@@ -406,3 +427,47 @@ def test_fetch_canonicalizes_fragments_for_exact_http_matching(monkeypatch):
     document = asyncio.run(fetch_page(HttpUrl("https://example.com/#intro")))
     assert str(document.url) == "https://example.com/docs"
     assert all(not request.url.fragment for request in requests)
+
+
+@pytest.mark.parametrize(
+    ("difficulty", "expected"),
+    [
+        ("easy", "VERY EASY factual"),
+        ("medium", "short explanation"),
+        ("hard", "synthesis, a tradeoff"),
+    ],
+)
+def test_difficulty_controls_grounded_task_prompt(monkeypatch, difficulty, expected):
+    generator = AsyncMock(
+        return_value=gemini.Generation(
+            data={
+                "tasks": [
+                    {
+                        "question": "What does Example help build?",
+                        "reference_answer": "Reliable widgets.",
+                        "source_quote": (
+                            "Example is a platform for building reliable widgets."
+                        ),
+                    }
+                ]
+            },
+            requested_model="test",
+        )
+    )
+    monkeypatch.setattr(gemini, "generate", generator)
+    tasks = asyncio.run(generate_tasks(PAGE, 1, difficulty))
+    instructions, payload, _ = generator.call_args.args
+    assert expected in instructions
+    assert "No external knowledge or browsing links" in instructions
+    assert payload["difficulty"] == difficulty
+    assert len(tasks) == 1
+
+
+@pytest.mark.parametrize("budget", [0, -1, 181, float("inf"), float("nan")])
+def test_latency_budget_bounds(budget):
+    with pytest.raises(ValueError):
+        ExperimentRequest(
+            url=PAGE.url,
+            harnesses=[HarnessConfig(name="codex")],
+            latency_budget_seconds=budget,
+        )

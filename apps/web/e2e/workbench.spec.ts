@@ -114,10 +114,12 @@ test("runs the full matrix and shows failure evidence, patches, and unverified c
   await expect(page.getByText("3 parallel sandboxes", { exact: true })).toBeVisible();
   await page.getByRole("checkbox", { name: /Gemini CLI/ }).check();
   await page.getByLabel("Product or documentation URL").fill(url);
+  await page.getByLabel("Task difficulty").selectOption("medium");
+  await page.getByLabel("Agent time target (seconds)").fill("20");
   await page.screenshot({ path: resolve(screenshots, "configure-desktop.png"), fullPage: true });
   await page.getByRole("button", { name: "Run experiment" }).click();
   await expect(page.getByRole("status")).toContainText("Gemini is getting to know your product");
-  expect(submitted).toEqual({ url, harnesses, task_count: 3 });
+  expect(submitted).toEqual({ url, harnesses, task_count: 3, difficulty: "medium", latency_budget_seconds: 20 });
   // The backend derives maximum concurrency from this matrix; the client never sends a smaller cap.
   expect(submitted).not.toHaveProperty("max_concurrency");
   phase = "baseline";
@@ -184,4 +186,34 @@ test("remains usable on mobile with reduced motion", async ({ page }) => {
   await page.getByText("VIEW CHANGE +", { exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: resolve(screenshots, "comparison-mobile.png"), fullPage: true });
+});
+
+test("shows a correct but slow baseline and a verified faster variant separately", async ({ page }) => {
+  const completed = experiment("completed");
+  completed.difficulty = "hard";
+  completed.latency_budget_seconds = 15;
+  for (const run of completed.baseline_runs) run.execution_duration_seconds = 20;
+  for (const [report, slow] of [[completed.baseline_evaluation!, true], [completed.variant_evaluation!, false]] as const) {
+    report.passed = slow ? 0 : 6;
+    report.failed = slow ? 6 : 0;
+    for (const result of report.runs) {
+      result.outcome = slow ? "fail" : "pass";
+      result.variant_attribution_eligible = true;
+      result.checks[0].outcome = "pass";
+      result.checks.push({ check_id: "agent-time", kind: "execution_duration_budget", description: "Agent time target", outcome: slow ? "fail" : "pass", reason: slow ? "20 seconds exceeds the 15 second target." : "10 seconds meets the 15 second target.", evidence: [], method: "deterministic", error: null });
+    }
+  }
+  await mockOptions(page);
+  await page.route("**/api/experiments/browser-fixture", route => route.fulfill({ json: completed }));
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("uptrack.experiment.v1", "browser-fixture"));
+  await page.reload();
+  await expect(page.getByText("hard difficulty", { exact: true })).toBeVisible();
+  await expect(page.getByText("Faster, correctness preserved", { exact: true })).toHaveCount(6);
+  await expect(page.getByText("-10.0s (-50.0%)", { exact: true })).toHaveCount(6);
+  await page.getByRole("tab", { name: /Original page/ }).click();
+  await expect(page.locator(".metric-grid > div").first()).toContainText("6/6");
+  await expect(page.locator(".metric-grid")).toContainText("6 over target · startup excluded");
+  await page.locator(".run-card summary").first().click();
+  await expect(page.getByText("Answer checks: passed. Agent time exceeded the target.").first()).toBeVisible();
 });

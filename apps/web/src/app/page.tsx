@@ -2,8 +2,14 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { answerOutcome } from "@/lib/report-metrics";
 import { fetchExperiment, fetchOptions, startExperiment } from "@/lib/api";
-import type { Experiment, ExperimentOptions, Phase } from "@/lib/types";
+import type {
+  Experiment,
+  ExperimentOptions,
+  Phase,
+  Difficulty,
+} from "@/lib/types";
 
 import { Arrow, Mark, Scene } from "@/components/lab-visuals";
 import {
@@ -29,6 +35,8 @@ export default function Home() {
   const [selected, setSelected] = useState<string[]>([]);
   const [url, setUrl] = useState("");
   const [taskCount, setTaskCount] = useState(3);
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [latencyBudget, setLatencyBudget] = useState(15);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +88,8 @@ export default function Home() {
         .then((data) => {
           setExperiment(data);
           setUrl(data.url);
+          setDifficulty(data.difficulty ?? "easy");
+          setLatencyBudget(data.latency_budget_seconds ?? 15);
           seenVariant.current = !!data.variant_evaluation;
           if (data.variant_evaluation) setTab("variant");
         })
@@ -139,6 +149,8 @@ export default function Home() {
         url,
         harnesses,
         task_count: taskCount,
+        difficulty,
+        latency_budget_seconds: latencyBudget,
       });
       setExperiment(data);
       setTab("baseline");
@@ -291,8 +303,8 @@ export default function Home() {
                 />
               </div>
               <p className="field-hint">
-                Start with a public documentation page. Gemini creates simple,
-                answerable tasks from it.
+                Start with a public documentation page. Gemini creates
+                answerable tasks grounded in the page.
               </p>
               <div className="field-heading">
                 <span className="field-label" id="agents-label">
@@ -371,6 +383,53 @@ export default function Home() {
                       : "API KEY NEEDED"}
                 </span>
               </div>
+              <div className="test-settings">
+                <div>
+                  <label className="field-label" htmlFor="difficulty">
+                    Task difficulty
+                  </label>
+                  <select
+                    id="difficulty"
+                    value={difficulty}
+                    onChange={(event) =>
+                      setDifficulty(event.target.value as Difficulty)
+                    }
+                  >
+                    <option value="easy">Easy — direct questions</option>
+                    <option value="medium">
+                      Medium — connect a few details
+                    </option>
+                    <option value="hard">Hard — apply the documentation</option>
+                  </select>
+                  <p className="field-hint">
+                    Hard tasks include code only when the page supports it.
+                  </p>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="latency-budget">
+                    Agent time target (seconds)
+                  </label>
+                  <input
+                    id="latency-budget"
+                    type="number"
+                    required
+                    min="0.1"
+                    max="180"
+                    step="0.1"
+                    value={latencyBudget}
+                    onChange={(event) =>
+                      setLatencyBudget(
+                        event.target.value === ""
+                          ? 0
+                          : Number(event.target.value),
+                      )
+                    }
+                  />
+                  <p className="field-hint">
+                    Agent execution only. Sandbox startup is excluded.
+                  </p>
+                </div>
+              </div>
               <div className="launch-row">
                 <div className="parallel-copy">
                   <label htmlFor="task-count">
@@ -382,9 +441,9 @@ export default function Home() {
                         setTaskCount(Number(event.target.value))
                       }
                     >
-                      <option value={1}>1 simple task</option>
-                      <option value={2}>2 simple tasks</option>
-                      <option value={3}>3 simple tasks</option>
+                      <option value={1}>1 task</option>
+                      <option value={2}>2 tasks</option>
+                      <option value={3}>3 tasks</option>
                     </select>
                   </label>
                   <span>
@@ -450,6 +509,13 @@ export default function Home() {
                   </span>
                 )}
               </div>
+              <p className="experiment-settings">
+                <span>{experiment.difficulty ?? "easy"} difficulty</span>
+                <span>
+                  {experiment.latency_budget_seconds ?? 15}s agent time target
+                </span>
+                <span>Excludes sandbox startup</span>
+              </p>
               <div
                 className={`progress-message ${experiment.phase === "failed" ? "has-error" : ""}`}
                 role="status"
@@ -466,7 +532,7 @@ export default function Home() {
                   <p>
                     {experiment.error ||
                       (experiment.phase === "planning"
-                        ? "Reading the page and creating a few straightforward questions."
+                        ? "Reading the page and creating questions at your chosen difficulty."
                         : experiment.phase === "completed"
                           ? "Inspect the evidence below, then decide what to improve."
                           : "You can leave this tab open. Each stage appears as it finishes.")}
@@ -478,7 +544,7 @@ export default function Home() {
                   <summary>
                     <span>Gemini’s test plan</span>
                     <span className="micro-label">
-                      {experiment.tasks.length} SIMPLE TASKS{" "}
+                      {experiment.tasks.length} TASKS{" "}
                       <span className="expand-sign">+</span>
                     </span>
                   </summary>
@@ -506,8 +572,12 @@ export default function Home() {
                       A <span>Original page</span>
                       {experiment.baseline_evaluation ? (
                         <span className="tab-count">
-                          {experiment.baseline_evaluation.passed}/
-                          {experiment.baseline_evaluation.runs.length}
+                          {
+                            experiment.baseline_evaluation.runs.filter(
+                              (run) => answerOutcome(run) === "pass",
+                            ).length
+                          }
+                          /{experiment.baseline_evaluation.runs.length}
                         </span>
                       ) : null}
                     </button>
@@ -522,8 +592,12 @@ export default function Home() {
                       B <span>Improved version</span>
                       {experiment.variant_evaluation ? (
                         <span className="tab-count">
-                          {experiment.variant_evaluation.passed}/
-                          {experiment.variant_evaluation.runs.length}
+                          {
+                            experiment.variant_evaluation.runs.filter(
+                              (run) => answerOutcome(run) === "pass",
+                            ).length
+                          }
+                          /{experiment.variant_evaluation.runs.length}
                         </span>
                       ) : null}
                     </button>

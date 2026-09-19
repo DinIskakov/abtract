@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 from app.artifacts import load_artifact, save_artifact
 from app.evaluations import (
+    Criterion,
     EvaluationReport,
     EvaluationRequest,
     TaskRubric,
@@ -19,7 +20,7 @@ from app.proposals import ProposalReport, ProposalRequest
 from app.routers.evaluations import create_evaluation, create_proposal
 from app.routers.runs import create_runs
 from app.runs import HarnessConfig, RunRequest, RunResult
-from app.task_generation import fetch_page, generate_tasks
+from app.task_generation import Difficulty, fetch_page, generate_tasks
 
 logger = logging.getLogger(__name__)
 Phase = Literal[
@@ -43,6 +44,8 @@ class ExperimentRequest(BaseModel):
     url: HttpUrl
     harnesses: list[HarnessConfig] = Field(min_length=1, max_length=4)
     task_count: int = Field(default=3, ge=1, le=3)
+    difficulty: Difficulty = "easy"
+    latency_budget_seconds: float = Field(default=15, gt=0, le=180, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def distinct_harnesses(self) -> Self:
@@ -61,6 +64,8 @@ class Experiment(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     tasks: list[TaskRubric] = Field(default_factory=list)
     harnesses: list[HarnessConfig]
+    difficulty: Difficulty = "easy"
+    latency_budget_seconds: float = Field(default=15, gt=0, le=180, allow_inf_nan=False)
     baseline_runs: list[RunResult] = Field(default_factory=list)
     baseline_evaluation: EvaluationReport | None = None
     proposal: ProposalReport | None = None
@@ -87,7 +92,26 @@ async def execute(experiment: Experiment, task_count: int) -> None:
         document = await fetch_page(experiment.url)
         # Redirects are resolved once, then both arms use the same canonical URL.
         experiment.url = document.url
-        experiment.tasks = await generate_tasks(document, task_count)
+        generated = await generate_tasks(document, task_count, experiment.difficulty)
+        # Freeze identical correctness and runtime criteria for both arms.
+        experiment.tasks = [
+            task.model_copy(
+                update={
+                    "criteria": [
+                        *task.criteria,
+                        Criterion(
+                            id="agent_latency",
+                            kind="execution_duration_budget",
+                            description=(
+                                "Agent runtime budget, excluding sandbox startup"
+                            ),
+                            limit=experiment.latency_budget_seconds,
+                        ),
+                    ]
+                }
+            )
+            for task in generated
+        ]
         request = RunRequest(
             url=experiment.url,
             tasks=[task.task for task in experiment.tasks],
@@ -176,6 +200,8 @@ async def start_experiment(request: ExperimentRequest) -> Experiment:
     experiment = Experiment(
         url=request.url,
         harnesses=request.harnesses,
+        difficulty=request.difficulty,
+        latency_budget_seconds=request.latency_budget_seconds,
         concurrency=len(request.harnesses) * request.task_count,
     )
     await persist(experiment, "planning")
