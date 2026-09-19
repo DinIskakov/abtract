@@ -1,0 +1,41 @@
+[tools]
+node = "24"
+bun = "1.3"
+uv = "latest"
+python = "3.12"
+
+[tasks.install]
+description = "Install dependencies for both frontend and backend"
+run = "bun install && (cd apps/api && uv sync)"
+
+[tasks.dev]
+description = "Run all workspace applications in development mode"
+run = "bun run dev"
+
+[tasks."dev:web"]
+description = "Run Next.js frontend only"
+run = "bun --filter web dev"
+
+[tasks."dev:api"]
+description = "Run FastAPI backend only"
+run = "bun --filter api dev"
+
+[tasks.build]
+description = "Build all workspace applications"
+run = "bun run build"
+
+[tasks.lint]
+description = "Lint all workspace applications"
+run = "bun run lint"
+
+[tasks."lint:fix"]
+description = "Fix lint issues across workspace applications"
+run = "bun run lint:fix"
+
+[tasks.test]
+description = "Run tests across all workspace applications"
+run = "bun run test"
+
+[tasks.typecheck]
+description = "Type check all workspace applications"
+run = "bun run typecheck"
