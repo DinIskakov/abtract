@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "../styles/dashboard.css";
+@import "../styles/product.css";
 
 :root {
   --background: #ffffff;

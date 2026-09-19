@@ -8,6 +8,16 @@ python = "3.12"
 description = "Install dependencies for both frontend and backend"
 run = "bun install && (cd apps/api && uv sync)"
 
+[tasks.setup]
+description = "Install dependencies, Chromium, and the local demo fixture"
+run = """
+bun install
+cd apps/api
+uv sync
+uv run playwright install chromium
+uv run python scripts/import_demo_site.py
+"""
+
 [tasks.dev]
 description = "Run all workspace applications in development mode"
 run = "bun run dev"
@@ -19,6 +29,18 @@ run = "bun --filter web dev"
 [tasks."dev:api"]
 description = "Run FastAPI backend only"
 run = "bun --filter api dev"
+
+[tasks."demo:import"]
+description = "Import the bundled demo site into the local API store"
+run = "cd apps/api && uv run python scripts/import_demo_site.py"
+
+[tasks."modal:serve"]
+description = "Serve the API and workers on Modal with hot reload"
+run = "cd apps/api && uv run modal serve deploy.py"
+
+[tasks."modal:deploy"]
+description = "Deploy the API and workers to Modal"
+run = "cd apps/api && uv run modal deploy deploy.py"
 
 [tasks.build]
 description = "Build all workspace applications"

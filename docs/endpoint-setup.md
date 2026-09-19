@@ -21,15 +21,17 @@ If Optimize reports `401 UNAUTHENTICATED` / `ACCESS_TOKEN_TYPE_UNSUPPORTED`, Goo
 Check authentication, routing, and served model names without generating inference:
 
 ```bash
-uv run python scripts/check_endpoints.py --env-file .env.modal
+cd apps/api && uv run python scripts/check_endpoints.py --env-file ../../.env.modal
 ```
 
 After filling in the Gemini key, deploy from the repository root:
 
 ```bash
-uv run modal secret create abtract-secrets --from-dotenv .env.modal
-uv run modal deploy deploy.py
-uv run python scripts/import_demo_site.py --modal
+cd apps/api
+uv run modal secret create abtract-secrets --from-dotenv ../../.env.modal
+cd ../..
+mise run modal:deploy
+cd apps/api && uv run python scripts/import_demo_site.py --modal
 ```
 
 Add `--force` to the secret command when replacing an existing secret, then redeploy. Open the printed dashboard URL and sign in as `abtract` with the password from `.env.modal`. The demo lives at `<site URL>/s/demo/v0/`; the product's **Try with the demo site** button fills that URL in. The default **Full audit** runs the selected grid in parallel and shows live results. Choose **Quick scan** for an optional smaller sample. Pushing to GitHub alone does not update Modal; redeploy after changing the code.

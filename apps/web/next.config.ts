@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
         source: "/openapi.json",
         destination: `${BACKEND_URL}/openapi.json`,
       },
+      {
+        source: "/screenshots/:path*",
+        destination: `${BACKEND_URL}/screenshots/:path*`,
+      },
     ];
   },
 };

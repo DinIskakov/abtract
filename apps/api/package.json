@@ -9,6 +9,6 @@
     "lint:fix": "uv run ruff check --fix . && uv run ruff format .",
     "typecheck": "uv run mypy app",
     "test": "uv run pytest",
-    "build": "uv sync"
+    "build": "uv sync --locked"
   }
 }

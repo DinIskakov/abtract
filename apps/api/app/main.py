@@ -2,19 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.hosting.serve import create_app as create_site_app
 from app.routers import health
+from app.routers.product import create_app as create_product_app
 
 
 def create_app() -> FastAPI:
-    application = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
-    )
-
-    # CORS configuration
+    application = create_product_app()
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -23,16 +17,19 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include routers under /api
     application.include_router(health.router, prefix="/api")
 
     @application.get("/")
     async def root() -> dict[str, str]:
         return {
             "message": f"Welcome to {settings.app_name}",
-            "docs": "/docs",
+            "docs": "/api/docs",
             "health": "/api/health",
         }
+
+    # The hosted test sites are backend resources and share the API process locally.
+    # This keeps one Python server and avoids a second port or launch command.
+    application.mount("/", create_site_app())
 
     return application
 
