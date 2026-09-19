@@ -1,5 +1,7 @@
 # abtract — A/B testing for AI agents
 
+**Joining the project? Start with the [developer quickstart](docs/developer-quickstart.md)** for the hosted demo, local setup without API keys, and the contribution workflow.
+
 abtract measures how well AI agents can use a website, then uses Gemini to propose a revised snapshot and tests it again. The working product is the Python app in `abtract/`. The original Next.js/FastAPI scaffold remains in `apps/` and `packages/`; its setup is preserved in [docs/monorepo.md](docs/monorepo.md).
 
 ## Product flow
