@@ -11,6 +11,8 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.81",
+    "lucide-react": "^1.47.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8"

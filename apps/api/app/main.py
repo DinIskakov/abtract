@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import health
+from app.routers import evals, health
 
 
 def create_app() -> FastAPI:
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
 
     # Include routers under /api
     application.include_router(health.router, prefix="/api")
+    application.include_router(evals.router, prefix="/api")
 
     @application.get("/")
     async def root() -> dict[str, str]:
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
             "message": f"Welcome to {settings.app_name}",
             "docs": "/docs",
             "health": "/api/health",
+            "evals_sample": "/api/evals/sample-report",
         }
 
     return application
