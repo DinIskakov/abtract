@@ -5,7 +5,7 @@ abtract measures how well AI agents can use a website, then uses Gemini to propo
 ## Product flow
 
 1. Enter a URL on the landing page, or choose **Try with the demo site**.
-2. abtract mirrors the site, chooses tasks, and runs a swarm while the job page shows progress.
+2. abtract mirrors the site, chooses tasks, and runs a swarm while the job page shows progress. Initial HTML checks appear as pages arrive; completed attempts, evidence, and preliminary findings update every two seconds during the swarm. These use existing data without extra model calls. The final report replaces the preview when the job finishes.
 3. The report shows task results, agent/model breakdowns, costs, and findings. The dashboard provides traces, screenshots, and version diffs.
 4. Choose **Optimize in a loop** for one to three iterations. Gemini proposes changes, the validator checks the candidate, and another swarm measures the new version against the original baseline. Failed validation rejects the candidate.
 
@@ -100,6 +100,8 @@ uv run python scripts/list_models.py
 ```
 
 Use `ABTRACT_MODEL_<ID>` overrides if the model names returned by your gateway do not match the registry. Gemini defaults to `gemini-3.8-flash`; `GEMINI_MODEL` can select another available model.
+
+For a separate endpoint URL per model, see [docs/endpoint-setup.md](docs/endpoint-setup.md). Verify routing and authentication with `uv run python scripts/check_endpoints.py --env-file .env.modal`.
 
 Local command-line smoke test:
 

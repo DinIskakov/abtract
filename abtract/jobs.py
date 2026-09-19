@@ -30,8 +30,9 @@ from abtract.intake.tasks import pick_tasks
 from abtract.modal_app import APP_NAME, app, base_image, secrets, volumes
 from abtract.models.registry import DEFAULT_SWARM, get_model
 from abtract.optimizer.findings import write_findings
+from abtract.optimizer.preview import attempt, inspect_page, update_attempts
 from abtract.optimizer.rewrite import optimize_site
-from abtract.schemas import AgentKind, Episode, Job, RunSummary, Task
+from abtract.schemas import AgentKind, Episode, Job, JobPreview, PreviewAttempt, RunSummary, Task
 from abtract.swarm.runner import run_swarm, serve_site_locally
 
 DEFAULT_AGENTS = [AgentKind.text, AgentKind.dom, AgentKind.vision]
@@ -55,6 +56,8 @@ def _progress(job: Job, phase: str | None = None, done: int | None = None, total
         job.log.append(f"[{time.strftime('%H:%M:%S')}] {log_line}")
         if len(job.log) > MAX_LOG_LINES:
             job.log = job.log[:20] + ["[...]"] + job.log[-(MAX_LOG_LINES - 21):]
+    if job.live_preview:
+        job.live_preview.updated_at = time.time()
     store.save_job(job)
     store.commit()
 
@@ -79,6 +82,10 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
     model_ids = list(job.model_ids) or list(DEFAULT_SWARM)
     agent_kinds = [AgentKind(k) for k in job.agent_kinds] or list(DEFAULT_AGENTS)
     total = _grid_size(tasks, model_ids, agent_kinds)
+    previous = job.live_preview
+    job.live_preview = JobPreview(site_version=version, total=total, task_sample=[t.prompt for t in tasks[:4]],
+                                  pages_scanned=previous.pages_scanned if previous and previous.site_version == version else 0,
+                                  observations=previous.observations if previous and previous.site_version == version else [])
     _progress(job, phase, 0, total,
               f"{phase}: {len(tasks)} tasks x models {model_ids} x agents {[k.value for k in agent_kinds]} "
               f"= {total} episodes ({'local' if local else 'modal'})")
@@ -90,10 +97,14 @@ def _run_swarm_phase(job: Job, site_id: str, version: str, tasks: list[Task], *,
         site_url = urls.site_url(site_id, version)
     _progress(job, log_line=f"site served at {site_url}")
     counter = {"n": 0}
+    results: list[PreviewAttempt] = []
+    task_of = {t.id: t for t in tasks}
 
     def on_episode(ep: Episode) -> None:
         counter["n"] += 1
         job.swarm_spent_usd += ep.cost_usd
+        results.append(attempt(ep, task_of))
+        update_attempts(job.live_preview, results)
         status = "ok  " if ep.success else f"FAIL[{ep.failure_mode}]"
         kind = ep.agent_kind.value if hasattr(ep.agent_kind, "value") else ep.agent_kind
         _progress(job, done=counter["n"],
@@ -131,8 +142,21 @@ def _findings_phase(job: Job, run: RunSummary, tasks: list[Task], baseline: RunS
 def _run_intake(job: Job, *, local: bool) -> None:
     if not job.url:
         raise ValueError("intake job needs a url")
+    job.live_preview = JobPreview()
     _progress(job, "Mirroring site", 0, 0, f"Mirroring site {job.url}")
-    sv, report = mirror_to_store(job.url, site_id=job.site_id)
+    last_page_update = 0.0
+
+    def on_page(path: str, html: bytes) -> None:
+        nonlocal last_page_update
+        preview = job.live_preview
+        preview.pages_scanned += 1
+        preview.observations = (preview.observations + inspect_page(path, html))[:8]
+        if preview.pages_scanned == 1 or time.monotonic() - last_page_update >= 1:
+            _progress(job, log_line=f"Read {preview.pages_scanned} page(s); latest: {path}")
+            last_page_update = time.monotonic()
+
+    sv, report = mirror_to_store(job.url, site_id=job.site_id, on_page=on_page)
+    job.live_preview.pages_scanned = len(report.pages)
     job.site_id, job.site_version = sv.site_id, sv.version
     msg = (f"mirrored {len(report.pages)} pages and {len(report.assets)} assets into {sv.site_id}/{sv.version}"
            + (f"; {len(report.errors)} fetch errors" if report.errors else "")

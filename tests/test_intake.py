@@ -87,6 +87,17 @@ def test_mirror_respects_max_pages(demo_server, tmp_path):
     assert report.errors == []
 
 
+def test_mirror_emits_page_checks_before_writing_complete_snapshot(demo_server, tmp_path):
+    seen = []
+    dest = tmp_path / "progress"
+    def on_page(path, html):
+        assert not (dest / "index.html").exists()
+        assert b"<html" in html.lower()
+        seen.append(path)
+    report = mirror_site(demo_server, dest, max_pages=3, on_page=on_page)
+    assert seen[0] == "index.html" and len(seen) == len(report.pages) == 3
+
+
 # a tiny hand-rolled site with the awkward cases: absolute same-origin links, <base>, query strings,
 # extension-less HTML, off-origin links, css url(), a 404 and a huge asset
 class _CasesHandler(BaseHTTPRequestHandler):

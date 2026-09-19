@@ -204,6 +204,33 @@ JobType = Literal["intake", "loop"]
 JobStatus = Literal["queued", "running", "done", "failed"]
 
 
+class PreviewAttempt(BaseModel):
+    episode_id: str
+    task_id: str
+    prompt: str
+    model_id: str
+    agent_kind: AgentKind
+    outcome: Literal["passed", "failed", "error", "skipped"]
+    reason: str = ""
+
+
+class JobPreview(BaseModel):
+    """Small, provisional snapshot; no traces or additional LLM inference."""
+    site_version: str = "v0"
+    pages_scanned: int = 0
+    observations: list[str] = Field(default_factory=list)
+    task_sample: list[str] = Field(default_factory=list)
+    total: int = 0
+    completed: int = 0
+    passed: int = 0
+    failed: int = 0
+    errors: int = 0
+    skipped: int = 0
+    findings: list[str] = Field(default_factory=list)
+    recent: list[PreviewAttempt] = Field(default_factory=list)
+    updated_at: float = Field(default_factory=time.time)
+
+
 class Job(BaseModel):
     """A background unit of work started from the landing page.
 
@@ -228,6 +255,7 @@ class Job(BaseModel):
     budget_usd: float | None = None       # abort before launching a swarm that would exceed this
     swarm_spent_usd: float = 0.0          # cumulative episode inference spend across this job
     findings: str | None = None           # plain-language report for the user (Gemini or rule-based)
+    live_preview: JobPreview | None = None
     error: str | None = None
     log: list[str] = []
     created_at: float = Field(default_factory=time.time)

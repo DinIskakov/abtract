@@ -263,7 +263,7 @@ def _build_job(req: JobRequest) -> Job:
 
 
 def _job_brief(job: Job) -> dict[str, Any]:
-    d = job.model_dump(exclude={"log", "findings"})
+    d = job.model_dump(exclude={"log", "findings", "live_preview"})
     d["n_runs"] = len(job.run_ids)
     d["has_findings"] = bool(job.findings)
     d["last_log"] = job.log[-1] if job.log else None

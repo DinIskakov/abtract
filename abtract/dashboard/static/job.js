@@ -275,6 +275,64 @@
     if (loadedNew && job.type === 'loop') renderStepper(job); // version labels may now resolve
   }
 
+  // ---------------------------------------------------------------- provisional results (no run cache; each job poll is a fresh snapshot)
+  function renderLivePreview(job) {
+    const box = $('#live-preview');
+    box.classList.toggle('hidden', job.status === 'done');
+    if (job.status === 'done') return;
+    const p = job.live_preview;
+    const key = JSON.stringify([job.status, job.phase, p, state.meta.models]);
+    if (state.previewKey === key) return;
+    state.previewKey = key;
+    box.replaceChildren(el('div', { class: 'card-head' }, el('h2', {}, 'Initial findings'),
+      el('span', { class: 'pill pending' }, job.status === 'failed' ? 'Partial results' : 'Live · preliminary')));
+    const status = job.status === 'failed' ? 'The run stopped. These are the results collected before it stopped.' :
+      p?.completed ? 'Results update as attempts finish. Early results may change as more agents report back.' :
+      p?.total ? 'Agents are working through your tasks. The first completed attempt will appear here automatically.' :
+      p?.pages_scanned ? 'We’re checking the fetched pages and preparing tasks for the agents.' :
+      'We’re fetching your website. Initial checks will appear here as pages arrive.';
+    box.append(el('p', { class: 'preview-note', role: 'status' }, status));
+    if (!p) return;
+    if (job.model_ids.length === 1 && job.model_ids[0] === 'mock') {
+      box.append(el('p', { class: 'preview-note' }, 'Offline workflow test: mock results do not measure website quality.'));
+    }
+    box.append(el('p', { class: 'sub' }, `${p.site_version} · ${p.pages_scanned} page${p.pages_scanned === 1 ? '' : 's'} scanned`));
+    if (p.total) {
+      const assessed = p.passed + p.failed;
+      box.append(el('div', { class: 'stat-row preview-stats' },
+        stat('Completed attempts', p.completed - p.skipped, v => `${v} / ${p.total}`, 'lower', null, 'remaining attempts are still untested'),
+        stat('Success so far', assessed ? p.passed / assessed : null, fmtPct, 'pct', null, `${assessed} assessed · ${p.errors} execution errors`)));
+    }
+    if (p.findings.length) {
+      box.append(el('h3', {}, 'What completed attempts show'),
+        el('ul', { class: 'preview-notes' }, ...p.findings.map(note => el('li', {}, note))));
+    }
+    if (p.recent.length) {
+      box.append(el('h3', {}, 'Latest completed attempts'));
+      const rows = el('div', { class: 'preview-attempts' });
+      for (const r of p.recent) {
+        const good = r.outcome === 'passed', failed = r.outcome === 'failed';
+        rows.append(el('article', { class: 'preview-attempt' },
+          el('div', { class: 'preview-attempt-head' },
+            el('span', { class: `pill ${good ? 'ok' : failed ? 'fail' : 'pending'}` }, cap(r.outcome)),
+            el('span', { class: 'sub' }, `${modelName(r.model_id)} · ${r.agent_kind}`)),
+          el('div', { class: 'preview-prompt' }, r.prompt),
+          r.reason ? el('div', { class: 'preview-reason' }, r.reason) : null));
+      }
+      box.append(rows);
+    } else if (p.task_sample.length) {
+      box.append(el('h3', {}, 'Tasks the agents are testing'),
+        el('ul', { class: 'preview-notes' }, ...p.task_sample.map(prompt => el('li', {}, prompt))));
+    }
+    if (p.observations.length) {
+      box.append(el('h3', {}, 'Initial page checks'),
+        el('p', { class: 'sub' }, 'These checks describe fetched HTML. The swarm will test their effect on real tasks.'),
+        el('ul', { class: 'preview-notes' }, ...p.observations.map(note => el('li', {}, note))));
+    } else if (p.pages_scanned && !p.completed) {
+      box.append(el('p', { class: 'preview-note' }, 'No potential obstacles found by the initial HTML checks yet. Agent tests may find other issues.'));
+    }
+  }
+
   // ---------------------------------------------------------------- rendering: report
   function stat(label, value, fmt, kind, before, sub) {
     const vals = el('div', { class: 'stat-vals' });
@@ -471,6 +529,7 @@
     renderProgress(job);
     renderRunsSoFar(job);
     renderCta(job);
+    renderLivePreview(job);
     if (job.status === 'done') renderReport(job);
     else $('#report').classList.add('hidden');
   }

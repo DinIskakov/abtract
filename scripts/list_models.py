@@ -45,8 +45,9 @@ def main() -> None:
     if names:
         unmatched = [m.id for m in MODELS.values() if m.provider == "modal" and resolve_modal_model(m) not in names]
         if unmatched:
-            print(f"\nNot matched to any gateway name (create the endpoint with `modal endpoint create --model <id>` or "
-                  f"set ABTRACT_MODEL_<ID> in .env): {', '.join(unmatched)}")
+            print(f"\nNot matched to this gateway: {', '.join(unmatched)}. "
+                  "For separate model URLs, run scripts/check_endpoints.py --env-file .env.modal; "
+                  "see docs/endpoint-setup.md for configuration.")
 
 
 if __name__ == "__main__":

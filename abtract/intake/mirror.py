@@ -25,7 +25,7 @@ import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -212,12 +212,14 @@ def _is_html(ctype: str | None, body: bytes) -> bool:
 # --------------------------------------------------------------------------- the crawl
 
 class _Crawl:
-    def __init__(self, root_url: str, dest: Path, *, max_pages: int, max_asset_bytes: int, timeout: float) -> None:
+    def __init__(self, root_url: str, dest: Path, *, max_pages: int, max_asset_bytes: int, timeout: float,
+                 on_page: Callable[[str, bytes], None] | None = None) -> None:
         self.root_url = root_url
         self.dest = dest
         self.max_pages = max_pages
         self.cap = max_asset_bytes
         self.timeout = timeout
+        self.on_page = on_page
         self.report = MirrorReport(root_url=root_url)
         self.local: dict[str, str] = {}                 # normalized url -> local path (pages + assets + aliases)
         self.pages: dict[str, tuple[str, bytes]] = {}   # normalized url -> (local path, html bytes)
@@ -356,6 +358,8 @@ class _Crawl:
             self.pages[final] = (local, f.body)
             self.local[final] = local
             self.local[url] = local
+            if self.on_page:
+                self.on_page(local, f.body)
             try:
                 soup = BeautifulSoup(f.body, "html.parser")
                 base = self._page_base(soup, f.url)
@@ -543,7 +547,7 @@ def _validate(dest: Path, report: MirrorReport) -> None:
 
 
 def mirror_site(url: str, dest: Path, *, max_pages: int = 40, max_asset_bytes: int = 8_000_000,
-                timeout: float = 20) -> MirrorReport:
+                timeout: float = 20, on_page: Callable[[str, bytes], None] | None = None) -> MirrorReport:
     """Crawl `url` (same-origin only) into `dest`. Never raises for a bad page; the report lists errors/skips."""
     url = url.strip()
     if "://" not in url:
@@ -558,7 +562,7 @@ def mirror_site(url: str, dest: Path, *, max_pages: int = 40, max_asset_bytes: i
                 url = str(r.url)
     except Exception:  # noqa: BLE001  HEAD not supported or transient; the GET below will report properly
         pass
-    crawl = _Crawl(url, dest, max_pages=max_pages, max_asset_bytes=max_asset_bytes, timeout=timeout)
+    crawl = _Crawl(url, dest, max_pages=max_pages, max_asset_bytes=max_asset_bytes, timeout=timeout, on_page=on_page)
     crawl.crawl()
     crawl.write()
     if not crawl.pages:

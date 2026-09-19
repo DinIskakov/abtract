@@ -134,6 +134,17 @@ footer.foot a { color: var(--muted); }
 .cta-row label { gap: 8px; }
 
 /* report */
+.live-preview { border-color: rgba(57, 135, 229, 0.45); }
+.preview-note { color: var(--ink-2); margin: 0 0 12px; font-size: 14px; }
+.preview-stats { margin-top: 14px; }
+.live-preview h3 { font-size: 14px; margin: 18px 0 8px; }
+.preview-notes { color: var(--ink-2); padding-left: 20px; font-size: 14px; }
+.preview-notes li { margin: 8px 0; overflow-wrap: anywhere; }
+.preview-attempts { display: grid; gap: 8px; }
+.preview-attempt { padding: 12px; border: 1px solid var(--grid); border-radius: 8px; background: var(--surface-2); }
+.preview-attempt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.preview-prompt { margin-top: 8px; font-size: 14px; overflow-wrap: anywhere; }
+.preview-reason { margin-top: 4px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .report-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 760px) { .report-grid2 { grid-template-columns: 1fr; } }
 .bars { display: grid; gap: 8px; }
