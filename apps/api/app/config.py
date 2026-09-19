@@ -50,5 +50,5 @@ class Settings(BaseSettings):
         return f"{base}/s/{site_id}/{version}/"
 
 
-# type: ignore[call-arg]  # pydantic-settings resolves validation aliases from the environment
-settings = Settings()
+# pydantic-settings resolves validation aliases from the environment
+settings = Settings()  # type: ignore[call-arg]
