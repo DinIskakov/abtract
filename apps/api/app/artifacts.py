@@ -10,7 +10,9 @@ from pydantic import BaseModel
 
 from app.config import settings
 
-ArtifactKind = Literal["runs", "evaluations", "proposals", "evaluation_inputs"]
+ArtifactKind = Literal[
+    "runs", "evaluations", "proposals", "evaluation_inputs", "experiments"
+]
 
 
 def artifact_path(kind: ArtifactKind, identifier: str) -> Path:

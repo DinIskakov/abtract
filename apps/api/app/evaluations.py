@@ -15,7 +15,7 @@ from app import gemini
 from app.runs import RunResult
 from app.variants import variant_hash
 
-GRADER_VERSION = "uptrack-evaluator-v1"
+GRADER_VERSION = "uptrack-evaluator-v2"
 Outcome = Literal["pass", "fail", "unknown"]
 
 
@@ -36,6 +36,7 @@ class Criterion(BaseModel):
         "python_syntax",
         "required_sources",
         "duration_budget",
+        "execution_duration_budget",
         "cost_budget",
         "semantic",
     ]
@@ -52,7 +53,10 @@ class Criterion(BaseModel):
             not self.values or any(not value.strip() for value in self.values)
         ):
             raise ValueError("Text and source checks require nonempty values")
-        if self.kind in {"duration_budget", "cost_budget"} and self.limit is None:
+        if (
+            self.kind in {"duration_budget", "execution_duration_budget", "cost_budget"}
+            and self.limit is None
+        ):
             raise ValueError("Budget checks require a limit")
         if self.kind == "semantic" and not (
             self.reference_answer and self.reference_answer.strip()
@@ -163,12 +167,17 @@ def deterministic_check(run: RunResult, criterion: Criterion) -> CheckResult:
         outcome="unknown",
         reason="No answer available",
     )
-    if criterion.kind in {"duration_budget", "cost_budget"}:
-        value = (
-            run.duration_seconds
-            if criterion.kind == "duration_budget"
-            else run.telemetry.estimated_cost_usd
-        )
+    if criterion.kind in {
+        "duration_budget",
+        "execution_duration_budget",
+        "cost_budget",
+    }:
+        values = {
+            "duration_budget": run.duration_seconds,
+            "execution_duration_budget": run.execution_duration_seconds,
+            "cost_budget": run.telemetry.estimated_cost_usd,
+        }
+        value = values[criterion.kind]
         result.reason = (
             "Metric unavailable"
             if value is None
@@ -177,6 +186,10 @@ def deterministic_check(run: RunResult, criterion: Criterion) -> CheckResult:
         if criterion.kind == "cost_budget":
             result.reason += (
                 "; cost is the available model-cost estimate, not total billing"
+            )
+        elif criterion.kind == "execution_duration_budget":
+            result.reason += (
+                "; seconds of agent execution, excluding sandbox startup and cleanup"
             )
         if value is not None and criterion.limit is not None:
             result.outcome = "pass" if value <= criterion.limit else "fail"

@@ -24,6 +24,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!apps/web/src/lib/
 lib64/
 parts/
 sdist/
@@ -42,6 +43,8 @@ MANIFEST
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+playwright-report/
+test-results/
 
 # Environment Variables
 .env

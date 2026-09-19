@@ -186,7 +186,8 @@ def test_endpoint_returns_native_telemetry_even_when_report_is_missing(backend):
     assert result["execution_duration_seconds"] is not None
 
 
-def test_runs_overlap_and_respect_concurrency_limit(backend):
+@pytest.mark.parametrize("limit, count, expected", [(2, 5, 2), (None, 6, 6)])
+def test_runs_overlap_and_respect_concurrency_limit(backend, limit, count, expected):
     factory, _ = backend
     original = factory.side_effect
     active = 0
@@ -201,7 +202,7 @@ def test_runs_overlap_and_respect_concurrency_limit(backend):
             nonlocal active, peak
             active += 1
             peak = max(peak, active)
-            if active == 2:
+            if active == expected:
                 gate.set()
             try:
                 # A sequential implementation cannot pass this rendezvous.
@@ -219,13 +220,13 @@ def test_runs_overlap_and_respect_concurrency_limit(backend):
         "/api/runs",
         json={
             **BODY,
-            "tasks": [f"Question {i}" for i in range(5)],
-            "max_concurrency": 2,
+            "tasks": [f"Question {i}" for i in range(count)],
+            **({"max_concurrency": limit} if limit else {}),
         },
     )
     assert response.status_code == 200
     assert all(r["status"] == "completed" for r in response.json())
-    assert peak == 2
+    assert peak == expected
     assert active == 0
 
 

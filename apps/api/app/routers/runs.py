@@ -16,7 +16,8 @@ async def create_runs(request: RunRequest) -> list[RunResult]:
             credentials(harness.name)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    semaphore = asyncio.Semaphore(request.max_concurrency)
+    combinations = len(request.harnesses) * len(request.tasks) * request.repetitions
+    semaphore = asyncio.Semaphore(request.max_concurrency or combinations)
 
     async def limited_run(
         harness_index: int, task_index: int, repetition: int

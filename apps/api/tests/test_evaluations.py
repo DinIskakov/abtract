@@ -5,8 +5,8 @@ import pytest
 from pydantic import ValidationError
 
 from app import gemini
-from app.evaluations import EvaluationRequest, evaluate
-from app.proposals import ProposalRequest, propose
+from app.evaluations import EvaluationRequest, content_hash, evaluate
+from app.proposals import ProposalRequest, document_evidence, propose
 from app.runs import AgentReport, HarnessConfig, RunResult
 
 
@@ -427,3 +427,104 @@ def test_semantic_judges_overlap_with_limit_and_preserve_order(
         assert completion_order != list(range(6))
 
     asyncio.run(exercise())
+
+
+def test_proposal_context_omits_scripts_but_hashes_full_document() -> None:
+    document = (
+        proposal_request()
+        .documents[0]
+        .model_copy(
+            update={"body": "<script>private code</script><main>Visible help</main>"}
+        )
+    )
+    evidence = document_evidence(document)
+    assert "private code" not in evidence["body"]
+    assert "Visible help" in evidence["body"]
+    assert evidence["original_sha256"] == content_hash(document.body)
+
+
+@pytest.mark.parametrize(
+    "agent_seconds,expected",
+    [(5, "pass"), (15, "pass"), (16, "fail"), (None, "unknown")],
+)
+def test_agent_latency_budget_excludes_sandbox_startup(agent_seconds, expected):
+    run = example_run(duration_seconds=150, execution_duration_seconds=agent_seconds)
+    report = asyncio.run(
+        evaluate(request(run, [criterion("execution_duration_budget", limit=15)]))
+    )
+    check = report.runs[0].checks[1]
+    assert check.outcome == expected
+    assert "excluding sandbox startup" in check.reason
+
+
+def test_correct_but_slow_answer_can_propose_efficiency_patch(monkeypatch):
+    run = example_run(execution_duration_seconds=22, duration_seconds=100)
+    evaluation = asyncio.run(
+        evaluate(
+            request(
+                run,
+                [
+                    criterion("required_text", values=["Sandbox.create"]),
+                    criterion("execution_duration_budget", limit=15),
+                ],
+            )
+        )
+    )
+    assert evaluation.runs[0].checks[1].outcome == "pass"
+    assert evaluation.runs[0].checks[2].outcome == "fail"
+    ref = f"{run.run_id}/execution_duration_budget"
+    generate = AsyncMock(
+        return_value=gemini.Generation(
+            data={
+                "summary": "Make the correct method easier to locate.",
+                "patches": [
+                    {
+                        "url": "https://example.com/docs",
+                        "old_text": "Create a sandbox using Sandbox.create().",
+                        "new_text": (
+                            "Quick start: Create a sandbox using Sandbox.create()."
+                        ),
+                        "rationale": "A heading may reduce lookup effort.",
+                        "failed_check_refs": [ref],
+                    }
+                ],
+            },
+            requested_model="judge",
+        )
+    )
+    monkeypatch.setattr(gemini, "generate", generate)
+    report = asyncio.run(
+        propose(
+            ProposalRequest(
+                evaluation=evaluation,
+                runs=[run],
+                documents=proposal_request().documents,
+            )
+        )
+    )
+    assert len(report.patches) == 1
+    assert report.patches[0].failed_check_refs == [ref]
+    payload = generate.call_args.args[1]
+    assert set(payload["failed_checks"]) == {ref}
+    assert payload["runs"][0]["metrics"]["execution_duration_seconds"] == 22
+    assert payload["runs"][0]["metrics"]["total_duration_seconds"] == 100
+
+
+def test_correct_fast_answer_does_not_invent_performance_failure(monkeypatch):
+    run = example_run(execution_duration_seconds=5, duration_seconds=100)
+    evaluation = asyncio.run(
+        evaluate(request(run, [criterion("execution_duration_budget", limit=15)]))
+    )
+    generate = AsyncMock()
+    monkeypatch.setattr(gemini, "generate", generate)
+    report = asyncio.run(
+        propose(
+            ProposalRequest(
+                evaluation=evaluation,
+                runs=[run],
+                documents=proposal_request().documents,
+            )
+        )
+    )
+    generate.assert_not_called()
+    assert report.patches == []
