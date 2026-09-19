@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Abtract - Next.js & FastAPI Monorepo",
-  description: "Fullstack monorepo powered by Next.js, FastAPI, Bun, uv, and Turborepo",
+  title: "Abtract — Autonomous Agent A/B Testing & Usability Engine",
+  description:
+    "Evaluate, benchmark, and automatically regenerate web applications for autonomous AI agents across Claude, Gemini, and GPT-4o.",
 };
 
 export default function RootLayout({
